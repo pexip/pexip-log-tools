@@ -30,3 +30,9 @@ Checks this repository for file updates and synchronises Pexip Log Tools on a us
 
 ## Pexip_Log_Tools.ps1
 Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports.
+
+## sync_pexscripts.sh
+Checks this repository for file updates and synchronises Pexip Log Tools on a user's PC (OSX).
+
+## pexsnap.py
+Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports (OSX).
