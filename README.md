@@ -14,13 +14,16 @@ Processes history databases from a diagnostic snapshot into summary of past conf
 Processes administrator logs and configuration database from a diagnostic snapshot into summary of connectivity loss events.
 
 ## mjxsummary.py
-Processes configuration database from a diagnostic snapshot and generates a summary of One Touch Join
+Processes configuration database from a diagnostic snapshot and generates a summary of One Touch Join config
 
 ## staticroutes.py
 Processes configuration database from a diagnostic snapshot into summary of conferencing node's static routes
 
 ## teamsload.py
 Processes history databases from a diagnostic snapshot if Teams Connector Enhanced Status is enabled ( Azure Event Hub )  and generates a utilization report of Teams Connector instances
+
+## pexwebapps.py
+Processes configuration database from a diagnostic snapshot into summary of Web App config
 
 ## Get-PexScripts.ps1
 Checks this repository for file updates and synchronises Pexip Log Tools on a user's PC
