@@ -504,4 +504,3 @@ if __name__ == "__main__":
             print("Usage: %s <snapshot folder>" % (os.path.basename(__file__)))
     except (IOError, KeyboardInterrupt):
         pass
-
