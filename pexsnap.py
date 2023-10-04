@@ -85,7 +85,7 @@ external_scripts = {
         'script':script_location+'/staticroutes.py'
     },
     'hitcounter': {
-        'logfile':'pex_report_hitcountery.log',
+        'logfile':'pex_report_hitcounter.log',
         'script':script_location+'/pexhitcounter.py'
     },
     'logreader': {
