@@ -81,30 +81,36 @@ $FilesToManage.Keys | ForEach-Object {
     $TempFile = "$LocalFile.tmp"
     $RemoteFile = $FilesToManage.Item($_)
 
-    # if the remote item content length differs from the local item content,
+    # if the remote item hash differs from the local item hash,
     # then download the remote file and backup the local file.
     
     # Download the remote file to a temporary file. 
     Write-Host "Downloading `"$($RemoteFile)`""
     Invoke-WebRequest -Uri $RemoteFile -Outfile $TempFile
+	
+	# Check if the remote file length is 0
+	$remoteFileLength = (Get-Item $TempFile).Length
     
-    # Compare the local file with downloaded file
+	if ($remoteFileLength -eq 0) {
+    Write-Host "The new version of the file is empty or could not be downloaded. Keeping the original file."
+    Remove-Item $TempFile  # Delete the empty temporary file
+	} else {
+    # Compare the local file with the downloaded file
     if ((Get-FileHash $LocalFile).Hash -ne (Get-FileHash $TempFile).Hash)
     {
         Write-Host "New file differs from local file. Creating a backup and keeping the new file."
         $NewFileName = $LocalFile.BaseName + "_" + $timestamp + $LocalFile.Extension
         Move-Item -Path $LocalFile -Destination $backupFolder\$NewFileName
         Move-Item -Path $TempFile -Destination $LocalFile
-        If ($_ -like "*Get-PexScripts.ps1") 
+		If ($_ -like "*Get-PexScripts.ps1") 
         {
             Write-Host "Looks like we have updated the Get-PexScripts.ps1 file, which is the file you are currently running."
             Write-Host "Re-running the script to get new changes."
             & "C:\Tools\Scripts\Get-PexScripts.ps1"
-        }        
         }
-    else 
-    {
+    } else {
         Write-Host "Local file is the same as downloaded file. No update needed. Proceeding to clear."
-        Remove-Item -Path $TempFile
+        Remove-Item $TempFile  # Delete the temporary file since it's not needed
     }
+}
 }
