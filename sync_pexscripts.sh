@@ -78,7 +78,7 @@ if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
     # Add script update to cron
     echo 'Adding run job to cron...'
     crontab -l | grep -v 'sync_pexscripts.sh' > ~/pexscripts/.cron
-    echo "00 10 * * * ~/pexscripts/sync_pexscripts.sh >/dev/null 2>&1" >> ~/pexscripts/.cron
+    echo "5 10 * * * ~/pexscripts/sync_pexscripts.sh >/dev/null 2>&1" >> ~/pexscripts/.cron
     crontab ~/pexscripts/.cron
     rm -f ~/pexscripts/.cron && touch ~/pexscripts/.sync_pexscripts_v3
 
