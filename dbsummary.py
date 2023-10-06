@@ -263,6 +263,7 @@ class DBAnalyser:
         platform_syslog = self._builddict(self.configuration, 'platform_syslogserver', ('address', 'port', 'transport'), 'id')
         platform_global = self._buildglobal(self.configuration, 'platform_global')
         platform_tuneables = self._builddict(self.configuration, 'platform_systemtuneable', ('setting',), 'name')
+        platform_loglevels = self._builddict(self.configuration, 'platform_loglevel', ('name', 'level'), 'id')
 
         default_disabled_codecs = {'MP4A-LATM_128', 'H264_H_0', 'H264_H_1'}
         if int(self.version['version-id'].split('.', 1)[0]) == 21:
@@ -348,6 +349,14 @@ class DBAnalyser:
                 print("Enabled codecs:", ', '.join(added_codecs))
             if missing_codecs:
                 print("Disabled codecs:", ', '.join(missing_codecs))
+
+        debuglogs = []
+        for log in platform_loglevels.values():
+                if log['level'] == 'DEBUG':
+                    debuglogs.append("%s" % (log['name']))
+        if len(debuglogs) > 0:
+            print()
+            print("Logs set to debug: " + ', '.join(debuglogs))
 
         blob = {'locations':{}}
 
