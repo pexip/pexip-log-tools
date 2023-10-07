@@ -276,6 +276,10 @@ class DBAnalyser:
         platform_dnsservers = self._builddict_join(self.configuration, 'platform_systemlocation_dns_servers', 'systemlocation_id', 'dnsserver_id', 'platform_dnsserver', 'address')
         platform_ntpservers = self._builddict_join(self.configuration, 'platform_systemlocation_ntp_servers', 'systemlocation_id', 'ntpserver_id', 'platform_ntpserver', 'address')
         platform_client_stunservers = self._builddict_join(self.configuration, 'platform_systemlocation_client_stun_servers', 'systemlocation_id', 'stunserver_id', 'platform_stunserver', 'address')
+        if int(self.version['version-id'].split('.', 1)[0]) >= 33:
+            platform_syslogservers = self._builddict_join(self.configuration, 'platform_systemlocation_syslog_servers', 'systemlocation_id', 'syslogserver_id', 'platform_syslogserver', 'address')
+        else:
+            platform_syslogservers = {}
         if int(self.version['version-id'].split('.', 1)[0]) >= 29:
             platform_client_turnservers = self._builddict_join(self.configuration, 'platform_systemlocation_client_turn_servers', 'systemlocation_id', 'turnserver_id', 'platform_turnserver', 'address')
         else:
@@ -381,6 +385,10 @@ class DBAnalyser:
 
             if loc['mtu']:
                 print("MTU: %s" % (loc['mtu'],))
+
+            if location_id in platform_syslogservers:
+                print("Syslog Servers: %s" % ', '.join(platform_syslogservers[location_id]))
+                blob[loc['name']]['syslog_servers'] = platform_syslogservers[location_id]
 
             if loc['local_mssip_domain']:
                 self._do_mssipdomain(loc['local_mssip_domain'])
