@@ -37,6 +37,12 @@ import fileinput
 import glob
 import json
 import os
+try:
+    import pexdesk
+    autokey = True
+except:
+    autokey = False
+    pass
 import re
 import subprocess
 import sys
@@ -148,8 +154,12 @@ def parse_args(args=None):
     parser.add_argument('-o', '--old', action='store_true', help='use older decryption method')
     return parser.parse_args(args=args)
 
-def decrypt(in_file, out_file, decrypt_method):
-    password = getpass()
+def decrypt(in_file, out_file, decrypt_method, key):
+    password = ''
+    if not key:
+        password = getpass()
+    else:
+        password = key
     try:
         if decrypt_method:
             decrypted_file = subprocess.call(['openssl', 'aes-256-cbc', '-d', '-out', out_file, '-in', in_file, '-md', 'md5', '-pass', 'pass:{}'.format(password)])
@@ -213,7 +223,7 @@ def select_snap(snapshot_path):
             if key == snap_select:
                 return value[0]
 
-def extract_snap(snapshot_output, snapshot_input, decrypt_method): # extract snapshot
+def extract_snap(snapshot_output, snapshot_input, decrypt_method, dir): # extract snapshot
     now = datetime.now()
     if os.path.exists(snapshot_output):
         os.rename(snapshot_output, snapshot_output+'_old_'+now.strftime("%H%M%S_%d%m%Y"))
@@ -226,7 +236,15 @@ def extract_snap(snapshot_output, snapshot_input, decrypt_method): # extract sna
     except:
         enc = True
     if enc:
-        decrypt(snapshot_input, snapshot_input.replace(".tgz", "-decrypted.tgz"), decrypt_method) # decrypt
+        key_to_use = ''
+        if autokey:
+            key = pexdesk.get_keys(dir)
+            for keys in key.values():
+                if snapshot_input.endswith(keys['filename']):
+                    key_to_use = keys['key']
+            decrypt(snapshot_input, snapshot_input.replace(".tgz", "-decrypted.tgz"), decrypt_method, key_to_use) # decrypt
+        else:
+            decrypt(snapshot_input, snapshot_input.replace(".tgz", "-decrypted.tgz"), decrypt_method, key_to_use) # decrypt
         snapshot_input = (snapshot_input.replace(".tgz", "-decrypted.tgz"))
     if not snapshot_input.endswith('.tgz'):
         print('Error: incorrect file format, expected .tgz got ' + os.path.split(snapshot_input)[1][-4:])
@@ -273,7 +291,7 @@ def main():
     else:
         snapshot_output = (parsed_snaps + "/" + args.dir)
     try:
-        extract_snap(snapshot_output, snapshot_input, decrypt_method) # extract snapshot to folder
+        extract_snap(snapshot_output, snapshot_input, decrypt_method, args.dir) # extract snapshot to folder
 
         if not os.path.exists(snapshot_output + parsedlogdir): # create parsed log directory
             os.makedirs(snapshot_output + parsedlogdir)
