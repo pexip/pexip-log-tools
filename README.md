@@ -8,7 +8,7 @@ Pexip log processing tools, for processing logs and databases into easy-to-read 
  * `logreader.py` - Processes support logs into log summaries for each call.
  * `mjxsummary.py` - Processes configuration database from a diagnostic snapshot and generates a summary of One Touch Join config
  * `Pexip_Log_Tools.ps1` - Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports.
- * `pexsnap.py` - ` - Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports (OSX).
+ * `pexsnap.py` - Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports (OSX).
  * `pexwebapps.py` - Processes configuration database from a diagnostic snapshot into summary of Web App config
  * `staticroutes.py` - Processes configuration database from a diagnostic snapshot into summary of conferencing node's static routes
  * `sync_pexscripts.sh` - Checks this repository for file updates and synchronises Pexip Log Tools on a user's PC (OSX).
