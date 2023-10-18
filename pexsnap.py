@@ -237,8 +237,8 @@ def extract_snap(snapshot_output, snapshot_input, decrypt_method, dir): # extrac
         enc = True
     if enc:
         key_to_use = ''
-        if autokey:
-            key = pexdesk.get_keys(dir)
+        key = pexdesk.get_keys(dir)
+        if autokey and key != None:
             for keys in key.values():
                 if snapshot_input.endswith(keys['filename']):
                     key_to_use = keys['key']
