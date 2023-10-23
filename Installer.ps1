@@ -6,7 +6,7 @@ $ScriptDownloadFolder = $defaultScriptDownloadFolder  # Set the default script d
 
 function DownloadScripts {
     # Display a warning and prompt the user to press Enter to continue
-    Write-Host "WARNING: Files will be downloaded to $defaultScriptDownloadFolder"
+    Write-Warning "WARNING: Files will be downloaded to $defaultScriptDownloadFolder"
     Read-Host "Press Enter to continue..."
 
     # Create the download folder if it doesn't exist
