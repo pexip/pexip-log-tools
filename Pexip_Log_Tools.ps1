@@ -23,7 +23,7 @@ Write-Host "`nChecking for updates, please wait....`n"
 ########### Setup environment (should not need to be changed)
 
 $programFiles = [Environment]::GetFolderPath('ProgramFiles')
-$appData = [Environment]::GetFolderPath('ApplicationData')
+$appData = [Environment]::GetFolderPath('LocalApplicationData')
 $programFiles86 = [Environment]::GetFolderPath('ProgramFilesX86')
 
 # Check if Python 3.9.x is installed
@@ -102,7 +102,7 @@ function Test-PexEnvironment {
             $fullPath = Join-Path $programFiles86 $path
 
             if (-not (Test-Path $fullPath)) {
-                $fullPath = Join-Path $appData $path
+                $fullPath = Join-Path $appData\Apps $path
 
                 if (-not (Test-Path $fullPath)) {
                     Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please reinstall the missing file in either of these locations and try again. "
