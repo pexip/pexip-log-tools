@@ -42,7 +42,6 @@ else {
 	exit 1  # Exit with an error code to indicate a problem
 }
 
-$PathToGrep = "Gow\bin\grep.exe"
 $PathToNotepad = "Notepad++\notepad++.exe"
 $PathToGrepWin = "grepWin\grepWin.exe"
 $PathToFile = "C:\Tools\file-5.03-bin\bin\file.exe"
@@ -84,7 +83,6 @@ $AnythingElseArray = @()
 $EnvironmentHash = @{
     "grepWin 1.6.16" = $PathToGrepWin;
     "Notepad++" = $PathToNotepad;
-	"grep" = $PathToGrep;
 }
 
 Set-StrictMode -Version latest
@@ -92,7 +90,6 @@ Set-StrictMode -Version latest
 function Test-PexEnvironment {
     $global:PathToNotepad = $null
     $global:PathToGrepWin = $null
-    $global:PathToGrep = $null
 
     foreach ($appName in $EnvironmentHash.Keys) {
         $path = $EnvironmentHash[$appName]
@@ -115,8 +112,6 @@ function Test-PexEnvironment {
                         $global:PathToNotepad = $fullPath
                     } elseif ($appName -eq "grepWin 1.6.16") {
                         $global:PathToGrepWin = $fullPath
-                    } elseif ($appName -eq "grep") {
-                        $global:PathToGrep = $fullPath
                     }
                 }
             } else {
@@ -125,8 +120,6 @@ function Test-PexEnvironment {
                     $global:PathToNotepad = $fullPath
                 } elseif ($appName -eq "grepWin 1.6.16") {
                     $global:PathToGrepWin = $fullPath
-                } elseif ($appName -eq "grep") {
-                    $global:PathToGrep = $fullPath
                 }
             }
         } else {
@@ -188,11 +181,9 @@ function Test-PexLogs {
                 if (Test-Path -Path $Snap -PathType Container ){
                     # Check to see if the snap folder matches the diagnostic snap pattern
                     if ($Snap | Select-String -Pattern "diagnostic_snapshot.*?(\\|$)") {
-                        & $PathToGrep -Eih "Irregular Pulse" "$Snap\$LogDir\*$SupportLog*" | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$IrregularPulseText"
-                        & $PathToGrep -Eih "Irregular Ping" "$Snap\$LogDir\*$DeveloperLog*" | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$IrregularPingText"
-                        & $PathToGrep -Eih "Reactor Stalling" "$Snap\$LogDir\*$DeveloperLog*" | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$RectorStallingText"
-                        #Start-Process $PathToGrep -ArgumentList ('-Eih "Irregular Ping"', "$Snap\$LogDir\$DeveloperLog*") -RedirectStandardOutput "$Snap\$LogDir\$ParsedLogDir\$IrregularPingText" -NoNewWindow
-                        #Start-Process $PathToGrep -ArgumentList ('-Eih "Reactor Stalling"', "$Snap\$LogDir\$DeveloperLog*") -RedirectStandardOutput "$Snap\$LogDir\$ParsedLogDir\$RectorStallingText" -NoNewWindow
+                        & findstr /S /I /C:"Irregular Pulse" $Snap\$LogDir\*$SupportLog* | Select-String -Pattern ":(20.*)" | ForEach-Object { $_.Matches.Groups[1].Value } | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$IrregularPulseText"
+                        & findstr /S /I /C:"Irregular Ping" $Snap\$LogDir\*$DeveloperLog* | Select-String -Pattern ":(20.*)" | ForEach-Object { $_.Matches.Groups[1].Value } | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$IrregularPingText"
+                        & findstr /S /I /C:"Reactor Stalling" $Snap\$LogDir\*$DeveloperLog* | Select-String -Pattern ":(20.*)" | ForEach-Object { $_.Matches.Groups[1].Value } | Sort-Object | Set-Content "$Snap\$LogDir\$ParsedLogDir\$RectorStallingText"
 
                         Start-Process $PathToPython -ArgumentList ("$vMotionScript", "`"$Snap`"") -RedirectStandardOutput "$Snap\$LogDir\$ParsedLogDir\$vMotionReport" -RedirectStandardError "$OutputFolder$TempError" -NoNewWindow -Wait
 
