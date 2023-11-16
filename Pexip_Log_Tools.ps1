@@ -99,7 +99,7 @@ function Test-PexEnvironment {
             $fullPath = Join-Path $programFiles86 $path
 
             if (-not (Test-Path $fullPath)) {
-                $fullPath = Join-Path $appData\Apps $path
+                $fullPath = Join-Path $appData\Programs $path
 
                 if (-not (Test-Path $fullPath)) {
                     Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please reinstall the missing file in either of these locations and try again. "
@@ -128,8 +128,6 @@ function Test-PexEnvironment {
                 $global:PathToNotepad = $fullPath
             } elseif ($appName -eq "grepWin 1.6.16") {
                 $global:PathToGrepWin = $fullPath
-            } elseif ($appName -eq "grep") {
-                $global:PathToGrep = $fullPath
             }
         }
     }
