@@ -102,7 +102,7 @@ function Test-PexEnvironment {
                 $fullPath = Join-Path $appData\Programs $path
 
                 if (-not (Test-Path $fullPath)) {
-                    Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please reinstall the missing file in either of these locations and try again. "
+                    Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please reinstall the missing file in either of these locations and try again or restart your PC if grepWin has been recently installed but the script couldn't find it. "
 					Write-Host "Please press Enter to close the window."
 					Read-Host
 					exit 1  # Exit with an error code to indicate a problem
