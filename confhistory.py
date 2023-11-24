@@ -117,19 +117,26 @@ class ConfHistory:
                 print("%s <%s> (%s) / %s" % (row['display_name'], row['source_alias'], row['protocol'], row['role']))
                 print("Call-ID: %s" % row['call_uuid'])
                 print("Participant-ID: %s" % row['id'])
+                print("Remote Address: %s" % row['remote_address'])
                 print("Start: %s / STILL CONNECTED" % connect_ts)
             else:
                 print("%s <%s> (%s) / %s" % (row['display_name'], row['remote_alias'], row['protocol'], row['role']))
                 print("Call-ID: %s" % row['call_uuid'])
                 print("Participant-ID: %s" % row['id'])
+                print("Remote Address: %s" % row['remote_address'])
                 if start_ts:
                     print("Start: %s / End: %s / Duration: %s" % (start_ts, end_ts, (datetime.strptime(end_ts, "%Y-%m-%d %H:%M:%S") - datetime.strptime(start_ts, "%Y-%m-%d %H:%M:%S"))))
                 else:
                     print("FAILED CALL / End: %s" % end_ts)
                 print("Disconnect Reason: %s" % row['disconnect_reason'])
 
+            if row.get("external_node_id"):
+                print("External-Node-ID: %s" % row['external_node_id'])
             print("Remote Vendor: %s" % row['vendor'])
-            print("Media Node: %s [%s, %s] / Signalling Node: %s [%s, %s]" % (row['media_node'], self.nodes.get(row['media_node'], "Unknown"), self.locations.get(row['media_node'], "Unknown"), row['signalling_node'], self.nodes.get(row['signalling_node'], "Unknown"), self.locations.get(row['signalling_node'], "Unknown")))
+            print("Media Node: %s [%s, %s] / Signalling Node: %s [%s, %s]" % (row['media_node'], self.nodes.get(row['media_node'], "Unknown"), self.locations.get(row['media_node'], "Unknown"), row['signalling_node'], self.nodes.get(row['signalling_node'], "Unknown"), self.locations.get(row['signalling_node'], "Unknown")), end="")
+            if (row['proxy_node']):
+                print(" / Proxy Node: %s [%s, %s]" % (row['proxy_node'], self.nodes.get(row['proxy_node'], "Unknown"), self.locations.get(row['proxy_node'], "Unknown")), end="")
+            print()
             print()
 
             if start_ts:
