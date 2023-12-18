@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""logreader: process support logs into easy-to-read per-call logs."""
+"""logreader: pass list of unified_support logs as a parameter."""
 
 # Copyright 2023 Pexip AS
 #
@@ -41,6 +41,7 @@ no_media = False
 no_vsr = False
 no_audio_msi = False
 call_map = {}
+conversation_map = defaultdict(set)
 quot_end = re.compile(r'(?<!\\)"(?:\s+|$)')
 path_element = re.compile(r"([A-Z]+)\((.+)\)")
 h323_vendor = re.compile(r"\(([0-9L\s,]+)\) \((.+)\)")
@@ -58,12 +59,40 @@ def stable_call_quality_to_text(quality_report, stream_type):
     return qualities.get(quality_report.get(stream_type, 0), "Unknown")
 
 
+class AdminFields:
+    def __init__(self):
+        self.fields = defaultdict(set)
+
+    def update(self, fields):
+        for key, value in fields.items():
+            self.fields[key].add(value)
+
+    def get_list(self, key, default=None):
+        if key not in self.fields:
+            if default is None:
+                return []
+
+            return default
+
+        return list(self.fields[key])
+
+    def get(self, key, default=None):
+        if key not in self.fields:
+            return default
+
+        value = list(self.fields[key])
+        if len(value) > 1:
+            return ", ".join(value)
+
+        return value[0]
+
+
 class Call:
     def __init__(self, callid):
         self.callid = callid
         # signaling node
         self.msgs = []
-        self.admin = {}
+        self.admin = AdminFields()
         self.media_host = "Unknown"
         self.signaling_host = "Unknown"
         self.external_participant_count = 0
@@ -113,7 +142,7 @@ class Call:
             if len(key) == 4:
                 msgs.update(set(tcpmsgs.get("%s:%s.%s:%s" % key, [])))
             elif len(key) == 2:
-                remote = "{}:{}".format(key[0], transport)
+                remote = f"{key[0]}:{transport}"
                 for tcp_key in tcpmsgs.keys():
                     if tcp_key.endswith(remote):
                         msgs.update(set(tcpmsgs[tcp_key]))
@@ -208,7 +237,7 @@ class Call:
                     # Pull out the media information from the Connector and populate
                     # the ssrc -> stream prettification map
                     for i, video_ssrc in enumerate(media["video"]["ssrcs"], 1):
-                        ssrc_stream_id_map[video_ssrc] = (i, "Stream {}".format(i))
+                        ssrc_stream_id_map[video_ssrc] = (i, f"Stream {i}")
                     ssrc_stream_id_map[media["presentation"]["ssrc"]] = (
                         11,
                         "Presentation",
@@ -221,7 +250,7 @@ class Call:
                     # Pull out the media request information from the MCU and populate
                     # the ssrc -> stream prettification map
                     for i, video_ssrc in enumerate(media["video"]["ssrcs"], 1):
-                        ssrc_stream_id_map[video_ssrc] = (i, "Stream {}".format(i))
+                        ssrc_stream_id_map[video_ssrc] = (i, f"Stream {i}")
                     ssrc_stream_id_map[media["presentation"]["ssrc"]] = (
                         11,
                         "Presentation",
@@ -291,15 +320,25 @@ class Call:
 
     def to_text(self, fp):
         init_msg = self.get_init()
-        fp.write("\n\nCall-ID: {}\n".format(self.callid))
-        if self.admin.get("protocol", "Unknown") in ["MSSIP", "API", "WebRTC"]:
+        fp.write(f"\n\nCall-ID: {self.callid}\n")
+        conversation_id = self.admin.get("conversation-id")
+        participant_id = self.admin.get("participant-id")
+        if conversation_id and set(self.admin.get_list("protocol", ["Unknown"])) & {
+            "MSSIP",
+            "API",
+            "WebRTC",
+            "SIP",
+        }:
+            fp.write(f"Conversation-ID: {conversation_id}\n")
+        if participant_id:
+            fp.write(f"Participant-ID: {participant_id}\n")
+        related_participants = conversation_map[conversation_id] - set(
+            self.admin.get_list("participant-id", [])
+        )
+        if related_participants:
             fp.write(
-                "Conversation-ID: {}\n".format(
-                    self.admin.get("conversation-id", "Unknown")
-                )
+                "Related Participants: {}\n".format(", ".join(related_participants))
             )
-        if self.admin.get("participant-id"):
-            fp.write("Participant-ID: {}\n".format(self.admin.get("participant-id")))
         if self.admin.get("service-type"):
             fp.write(
                 "Service: {} ({}) / Protocol: {}\n".format(
@@ -309,7 +348,7 @@ class Call:
                 )
             )
         if not isinstance(init_msg, H245Message):
-            fp.write("From: {} / To: {}".format(init_msg.from_addr, init_msg.to_addr))
+            fp.write(f"From: {init_msg.from_addr} / To: {init_msg.to_addr}")
             if self.admin.get("direction"):
                 fp.write(" / Direction: {}".format(self.admin.get("direction")))
             fp.write("\n")
@@ -337,7 +376,7 @@ class Call:
             )
         fp.write("\n")
 
-        fp.write("Remote Vendor: {}\n".format(self.get_vendor()))
+        fp.write(f"Remote Vendor: {self.get_vendor()}\n")
         if self.admin.get("detail"):
             fp.write("Disconnect Reason: {}\n".format(self.admin.get("detail")))
         for msg in self.msgs:
@@ -353,7 +392,7 @@ class Call:
                 continue
             if isinstance(msg, ExternalSpeakerMessage) and no_audio_msi:
                 continue
-            fp.write("{}\n".format(msg))
+            fp.write(f"{msg}\n")
 
 
 class Message:
@@ -466,11 +505,11 @@ class SIPMessage(Message):
                 elif line.startswith("a=crypto"):
                     crypto = True
                 elif line in ("a=sendonly", "a=recvonly", "a=inactive"):
-                    m_line += " [{}]".format(line[2:])
+                    m_line += f" [{line[2:]}]"
 
         if m_line:
             self.aux.append(m_line)
-            self.aux.append("[Crypto: {}]".format(crypto))
+            self.aux.append(f"[Crypto: {crypto}]")
 
         if bandwidth:
             self.aux.insert(0, bandwidth)
@@ -489,10 +528,10 @@ class SIPMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {} ".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]} "
         else:
-            ret = "{} {} <- {} ".format(self.tts, self.dst[0], self.src[0])
-        ret += "[{}] ".format(self.proto)
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]} "
+        ret += f"[{self.proto}] "
         indent = len(ret)
 
         if self.method.startswith("SIP/2.0"):
@@ -503,7 +542,7 @@ class SIPMessage(Message):
             ret += self.fields.get("cseq", self.method.split()[0])
 
         if self.missing_fragments:
-            ret += " (missing {} fragment(s))".format(self.missing_fragments)
+            ret += f" (missing {self.missing_fragments} fragment(s))"
 
         if "content-type" in self.fields:
             if self.fields["content-type"].lower() == "application/sdp":
@@ -529,7 +568,7 @@ class SIPMessage(Message):
                             ret += user.attrib["entity"]
                 except (SyntaxError, ValueError) as pe:
                     if self.missing_fragments == 0:
-                        ret += " Parse Error ({})".format(pe)
+                        ret += f" Parse Error ({pe})"
 
         if "reason" in self.fields:
             ret += " (" + self.fields["reason"] + ")"
@@ -546,7 +585,7 @@ class SIPMessage(Message):
                 start += 8
                 end = ms_diagnostics.find('"', start)
                 if end > -1:
-                    ret += " (Reason: {})".format(ms_diagnostics[start:end])
+                    ret += f" (Reason: {ms_diagnostics[start:end]})"
 
         if self.aux and show_ports:
             ret += "\n" + (" " * indent)
@@ -588,11 +627,11 @@ class SIPSummaryMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {} ".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]} "
         else:
-            ret = "{} {} <- {} ".format(self.tts, self.dst[0], self.src[0])
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]} "
 
-        ret += "[{}] ".format(self.proto)
+        ret += f"[{self.proto}] "
         ret += "{} {}".format(self.fields["cseq"], self.fields["method"])
 
         if "status-code" in self.fields:
@@ -644,9 +683,9 @@ class WebRTCMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {} ".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]} "
         else:
-            ret = "{} {} <- {} ".format(self.tts, self.dst[0], self.src[0])
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]} "
         indent = len(ret)
 
         ret += self.method
@@ -694,7 +733,7 @@ class RESTMessage(Message):
         self.participant = None
         if (
             "participants" in urlpath
-            and "calls" not in urlpath
+            and not ("calls" in urlpath and "breakouts" not in urlpath)
             and self.method != "PARTICIPANTS"
         ):
             self.participant = urlpath[urlpath.index("participants") + 1]
@@ -736,7 +775,7 @@ class RESTMessage(Message):
                     elif line.startswith("c=") and not client_ip:
                         client_ip = line.strip()
                     elif line in ("a=sendonly", "a=recvonly", "a=inactive"):
-                        m_line += " [{}]".format(line[2:])
+                        m_line += f" [{line[2:]}]"
                     elif line == "a=content:slides":
                         m_line += " (slides)"
 
@@ -796,9 +835,9 @@ class RESTMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {} ".format(self.tts, self.src, self.dst)
+            ret = f"{self.tts} {self.src} -> {self.dst} "
         else:
-            ret = "{} {} <- {} ".format(self.tts, self.dst, self.src)
+            ret = f"{self.tts} {self.dst} <- {self.src} "
         indent = len(ret)
 
         ret += self.method_path + self.method
@@ -903,6 +942,16 @@ class RESTMessage(Message):
                         else:
                             ret += "\n{}+ {} (ALL)".format(" " * indent, src_room)
 
+            if self.method == "BREAKOUT":
+                ret += " (Breakout UUID: {})".format(
+                    self.payload["breakout_uuid"],
+                )
+                for participant in self.payload["participants"]:
+                    ret += "\n{}+ {}".format(" " * indent, participant)
+
+            if not self.out and self.method == "CALLS" and self.participant:
+                ret += f" (Participant-ID: {self.participant})"
+
             # Teams method
             if self.method == "ROSTER":
                 roster = self.payload["roster"]
@@ -914,42 +963,39 @@ class RESTMessage(Message):
                 )
                 for user in added_users:
                     ret += "\n" + " " * indent
-                    ret += (
-                        "+ {} (type: {}, presenting: {}, lobby: {}, muted: {})".format(
-                            (user["display"] or user["alias"]),
-                            user["type"],
-                            user.get("presenting"),
-                            user.get("is_in_lobby"),
-                            user.get("is_muted"),
-                        )
+                    ret += "+ {} (type: {}, presenting: {}, lobby: {}, muted: {}, spotlight: {})".format(
+                        (user["display"] or user["alias"]),
+                        user["type"],
+                        user.get("presenting"),
+                        user.get("is_in_lobby"),
+                        user.get("is_muted"),
+                        bool(user.get("published_states", {}).get("spotlight", False)),
                     )
                 for user in updated_users:
                     ret += "\n" + " " * indent
-                    ret += (
-                        "~ {} (type: {}, presenting: {}, lobby: {}, muted: {})".format(
-                            (user["display"] or user["alias"]),
-                            user["type"],
-                            user.get("presenting"),
-                            user.get("is_in_lobby"),
-                            user.get("is_muted"),
-                        )
+                    ret += "~ {} (type: {}, presenting: {}, lobby: {}, muted: {}, spotlight: {})".format(
+                        (user["display"] or user["alias"]),
+                        user["type"],
+                        user.get("presenting"),
+                        user.get("is_in_lobby"),
+                        user.get("is_muted"),
+                        bool(user.get("published_states", {}).get("spotlight", False)),
                     )
                 for user in deleted_users:
                     ret += "\n" + " " * indent
-                    ret += (
-                        "- {} (type: {}, presenting: {}, lobby: {}, muted: {})".format(
-                            (user["display"] or user["alias"]),
-                            user["type"],
-                            user.get("presenting", []),
-                            user.get("is_in_lobby"),
-                            user.get("is_muted"),
-                        )
+                    ret += "- {} (type: {}, presenting: {}, lobby: {}, muted: {}, spotlight: {})".format(
+                        (user["display"] or user["alias"]),
+                        user["type"],
+                        user.get("presenting", []),
+                        user.get("is_in_lobby"),
+                        user.get("is_muted"),
+                        bool(user.get("published_states", {}).get("spotlight", False)),
                     )
         elif self.payload != "":
             if self.method == "UPDATE" and str(self.payload).startswith("v=0"):
                 ret += " + SDP"
             elif self.method == "ROSTER" and isinstance(self.payload, list):
-                ret += " (Response Total {})".format(self.external_participant_count)
+                ret += f" (Response Total {self.external_participant_count})"
                 for roster_response in self.payload:
                     ret += "\n" + " " * indent
                     ret += "+ {} (tag: {})".format(
@@ -957,9 +1003,9 @@ class RESTMessage(Message):
                         roster_response["tag"],
                     )
             else:
-                ret += " (Response: {})".format(self.payload)
+                ret += f" (Response: {self.payload})"
         elif self.participant:
-            ret += " (Participant-ID: {})".format(self.participant)
+            ret += f" (Participant-ID: {self.participant})"
 
         if self.aux and show_ports:
             ret += "\n" + (" " * indent)
@@ -1014,7 +1060,7 @@ class RESTEvent(Message):
                     elif line.startswith("c=") and not client_ip:
                         client_ip = line.strip()
                     elif line in ("a=sendonly", "a=recvonly", "a=inactive"):
-                        m_line += " [{}]".format(line[2:])
+                        m_line += f" [{line[2:]}]"
                     elif line == "a=content:slides":
                         m_line += " (slides)"
 
@@ -1025,9 +1071,9 @@ class RESTEvent(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {}   ".format(self.tts, self.src, self.dst)
+            ret = f"{self.tts} {self.src} -> {self.dst}   "
         else:
-            ret = "{} {} <- {}   ".format(self.tts, self.dst, self.src)
+            ret = f"{self.tts} {self.dst} <- {self.src}   "
         indent = len(ret)
 
         ret += "Event: " + self.event
@@ -1128,18 +1174,18 @@ class BFCPMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {}".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]}"
         else:
-            ret = "{} {} <- {}".format(self.tts, self.dst[0], self.src[0])
-        ret += " BFCP {}".format(self.method)
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]}"
+        ret += f" BFCP {self.method}"
         if self.trans_id:
-            ret += " ({})".format(self.trans_id)
+            ret += f" ({self.trans_id})"
         if self.floor_req_id:
-            ret += " (FloorRequestId={})".format(self.floor_req_id)
+            ret += f" (FloorRequestId={self.floor_req_id})"
         if self.req_status:
-            ret += " {}".format(self.req_status)
+            ret += f" {self.req_status}"
         if self.mode:
-            ret += " {}".format(self.mode)
+            ret += f" {self.mode}"
         return ret
 
 
@@ -1204,7 +1250,7 @@ class H225Message(Message):
                         ipaddr = ".".join([str(int(x, 16)) for x in vals])
                         line = lines.pop(0).strip()
                         vals = line.split()
-                        self.tags.append("ipAddress: {}:{}".format(ipaddr, vals[1]))
+                        self.tags.append(f"ipAddress: {ipaddr}:{vals[1]}")
                     state = ""
 
             if line.startswith("reason"):
@@ -1212,10 +1258,10 @@ class H225Message(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {}".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]}"
         else:
-            ret = "{} {} <- {}".format(self.tts, self.dst[0], self.src[0])
-        ret += " H225 {}".format(self.method)
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]}"
+        ret += f" H225 {self.method}"
         if self.tags:
             ret += " ({})".format("; ".join(self.tags))
         return ret
@@ -1267,7 +1313,7 @@ class H245Message(Message):
                     ipaddr = ".".join([str(int(x, 16)) for x in vals])
                     line = lines.pop(0).strip()
                     vals = line.split()
-                    self.tags.append("ipAddress: {}:{}".format(ipaddr, vals[1]))
+                    self.tags.append(f"ipAddress: {ipaddr}:{vals[1]}")
             elif line.startswith("subMessageIdentifier") and self.method.startswith(
                 "generic"
             ):
@@ -1289,12 +1335,12 @@ class H245Message(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} {} -> {}".format(self.tts, self.src[0], self.dst[0])
+            ret = f"{self.tts} {self.src[0]} -> {self.dst[0]}"
         else:
-            ret = "{} {} <- {}".format(self.tts, self.dst[0], self.src[0])
-        ret += " H245 {}".format(self.method)
+            ret = f"{self.tts} {self.dst[0]} <- {self.src[0]}"
+        ret += f" H245 {self.method}"
         if self.tag:
-            ret += " ({})".format(self.tag)
+            ret += f" ({self.tag})"
         return ret
 
 
@@ -1310,9 +1356,7 @@ class RTMPMessage(Message):
 
     def __str__(self):
         indent = len(self.tts) + 1
-        ret = "{} {}:{} -> {}:{}\n".format(
-            self.tts, self.src[0], self.src[1], self.dst[0], self.dst[1]
-        )
+        ret = f"{self.tts} {self.src[0]}:{self.src[1]} -> {self.dst[0]}:{self.dst[1]}\n"
         ret += " " * indent
         ret += "{}: {} ({})".format(
             self.fields["message"], self.fields["url"], self.fields.get("src-path")
@@ -1330,6 +1374,7 @@ class GMSMessage(Message):
         self.msg = fields.get("message")
         self.call = fields.get("call-id")
         self.request_id = fields.get("request-id")
+        self.type = fields.get("type")
         self.request = None
         self.response = None
         self.to_addr = "meet.google.com"
@@ -1337,11 +1382,18 @@ class GMSMessage(Message):
         self.payload = {}
         self.qp = {}
         self.req = ""
-
         if not fields.get("detail"):
             return
 
+        # this is subtle: ensure we can continue to parse old style http and notif messages pre v34
+        if self.type == "data-channel" or self.msg == "Received GMS notification":
+            self._parse_type_data_channel(fields)
+        else:
+            self._parse_type_http(fields)
+
+    def _parse_type_http(self, fields):
         lines = fields.get("detail").split("^M")
+
         if lines[0].startswith("HTTP"):
             self.req = lines[0][9:]
             return
@@ -1351,21 +1403,10 @@ class GMSMessage(Message):
             except (ValueError, json.decoder.JSONDecodeError):
                 self.payload = {"message": fields.get("detail")}
             return
-        if self.msg == "Received GMS notification":
-            for i in range(len(lines)):  # pylint: disable=consider-using-enumerate
-                line = lines[i]
-                i += 1
-                if ":" in line:
-                    key, val = line.split(":", 1)
-                    self.payload[key.strip()] = val.strip()
-                elif "notification {" in line:
-                    self.payload["notification"] = lines[i].strip().rstrip(" {")
-                    i += 1
-            return
 
         request_line = lines[0].split()
         url = urlparse(request_line[1])
-        self.req = "{} {}".format(request_line[0], url.path)
+        self.req = f"{request_line[0]} {url.path}"
         self.qp = parse_qs(url.query)
 
         # Parse HTTP headers
@@ -1385,18 +1426,109 @@ class GMSMessage(Message):
             return
 
         try:
-            from si.signalling.gms.message import message
+            self.payload = json.loads(data)
+        except (ValueError, json.decoder.JSONDecodeError):
+            self.payload = {}
+        if not isinstance(self.payload, dict):
+            self.payload = {}
 
-            msg = message.Message.from_request(
-                request_line[1].encode(),
-                request_line[0].encode(),
-                headers,
-                data=data or None,
-            )
-            if msg.content.DESCRIPTOR.name == "MediaStreamModifyRequest":
+    def _parse_type_data_channel(self, fields):
+        lines = fields.get("detail").split("^M")
+
+        error_response = False
+        for i in range(len(lines)):  # pylint: disable=consider-using-enumerate
+            line = lines[i]
+            i += 1
+            if ":" in line:
+                key, val = line.split(":", 1)
+                self.payload[key.strip()] = val.strip()
+                continue
+
+            if self.msg == "Received GMS notification":
+                if "notification {" in line:
+                    self.payload["notification"] = lines[i].strip().rstrip(" {")
+                    i += 1
+
+            elif self.msg == "Sending GMS request":
+                if "media_stream_add {" in line:
+                    self.req = "RPC media_stream_add"
+                elif "media_stream_modify {" in line:
+                    self.req = "RPC media_stream_modify"
+                elif "media_stream_search {" in line:
+                    self.req = "RPC media_stream_search"
+
+            elif self.msg == "Received GMS response":
+                if "status {" in line:
+                    if "}" in lines[i]:
+                        self.req = "RPC OK"
+                    else:
+                        error_response = True
+                        self.req = "RPC ERROR"
+
+        if error_response:
+            try:
+                rpc_errors = [
+                    "OK",
+                    "CANCELLED",
+                    "UNKNOWN",
+                    "INVALID_ARGUMENT",
+                    "DEADLINE_EXCEEDED",
+                    "NOT_FOUND",
+                    "ALREADY_EXISTS",
+                    "PERMISSION_DENIED",
+                    "UNAUTHENTICATED",
+                    "RESOURCE_EXHAUSTED",
+                    "FAILED_PRECONDITION",
+                    "ABORTED",
+                    "OUT_OF_RANGE",
+                    "UNIMPLEMENTED",
+                    "INTERNAL",
+                    "UNAVAILABLE",
+                    "DATA_LOSS",
+                ]
+                error = rpc_errors[int(self.payload.get("code"))]
+                self.req += f"({error})"
+            except Exception:  # pylint: disable=broad-except  # noqa: S110
+                pass
+
+        if self.msg in ["Received GMS notification", "Received GMS response"]:
+            return
+
+        try:
+            import si.signalling.gms.message.ext_hangouts as ext_hangouts_pb2
+            from google.protobuf import text_format
+
+            def _try_gms_dcrpc_decode(data):
+                types = [
+                    ext_hangouts_pb2.DataChannelRpcRequest,
+                    ext_hangouts_pb2.DataChannelRpcResponse,
+                ]
+                for cls in types:
+                    msg = cls()
+                    try:
+                        text_format.Parse(data, msg)
+                        if msg.HasField("media_stream_add"):
+                            return msg.media_stream_add
+                        if msg.HasField("media_stream_modify"):
+                            return msg.media_stream_modify
+                        if msg.HasField("media_stream_search"):
+                            return msg.media_stream_search
+                    except text_format.ParseError:
+                        continue
+                return None
+
+            msg = _try_gms_dcrpc_decode("\n".join(lines))
+            if msg is None:
+                return
+
+            if isinstance(msg, ext_hangouts_pb2.MediaStreamModifyRequest):
                 vsrs = []
-                for stream in msg.content.resource:
-                    if stream.direction != 1 or not stream.request.send:
+                for stream in msg.resource:
+                    if (
+                        stream.direction
+                        != ext_hangouts_pb2.MediaStreamDirection.Value("DOWN")
+                        or not stream.request.send
+                    ):
                         continue
                     vsrs.append(
                         "{}@{}p{}".format(
@@ -1409,25 +1541,18 @@ class GMSMessage(Message):
         except Exception:  # pylint: disable=broad-except  # noqa: S110
             pass
 
-        try:
-            self.payload = json.loads(data)
-        except (ValueError, json.decoder.JSONDecodeError):
-            self.payload = {}
-        if not isinstance(self.payload, dict):
-            self.payload = {}
-
     def __str__(self):
         if self.response:
-            ret = "{} -> meet.google.com ".format(self.tts)
+            ret = f"{self.tts} -> meet.google.com "
         elif self.request_id:
-            ret = "{} <- meet.google.com ".format(self.tts)
+            ret = f"{self.tts} <- meet.google.com "
         else:
-            ret = "{} ** {}".format(self.tts, self.msg)
+            ret = f"{self.tts} ** {self.msg}"
 
         if "reason" in self.fields:
             ret += self.fields["reason"]
             if self.request and self.request.req:
-                ret += " [{}]".format(self.request.req)
+                ret += f" [{self.request.req}]"
             if isinstance(self.payload, dict):
                 message = self.payload.get("message") or self.payload.get(
                     "error", {}
@@ -1435,7 +1560,7 @@ class GMSMessage(Message):
             else:
                 message = self.payload
             if message:
-                ret += " ({})".format(message)
+                ret += f" ({message})"
         elif self.msg == "Received GMS notification":
             ret += " ({})".format(self.payload.get("notification"))
             if self.payload.get("notification") == "meetings_update":
@@ -1449,13 +1574,13 @@ class GMSMessage(Message):
                 ret += " [Trusted]"
 
             if self.payload.get("events"):
-                ret += " ({})".format(self.events())
+                ret += f" ({self.events()})"
             elif self.request and self.request.req:
                 events = self.request.events()
                 if events:
-                    ret += " [{} ({})]".format(self.request.req, events)
+                    ret += f" [{self.request.req} ({events})]"
                 else:
-                    ret += " [{}]".format(self.request.req)
+                    ret += f" [{self.request.req}]"
 
         return ret
 
@@ -1501,9 +1626,9 @@ class TeamsMessage(Message):
 
     def __str__(self):
         if self.out:
-            ret = "{} -> {} ".format(self.tts, self.dst)
+            ret = f"{self.tts} -> {self.dst} "
         else:
-            ret = "{} <- {} ".format(self.tts, self.dst)
+            ret = f"{self.tts} <- {self.dst} "
         indent = len(ret)
         ret += self.method
 
@@ -1581,11 +1706,11 @@ class TeamsCustomMessage(Message):
 
     def __str__(self):
         ret = self.tts + " "
-        ret += "** {}".format(self.msg)
+        ret += f"** {self.msg}"
         fs = []
         for f in self.fields:
             if f not in ["message", "call-id", "level", "name"]:
-                fs.append("{}: {}".format(f, self.fields[f]))
+                fs.append(f"{f}: {self.fields[f]}")
         ret += " ({})".format(", ".join(fs))
         return ret
 
@@ -1600,10 +1725,10 @@ class LogMessage(Message):
     def __str__(self):
         ret = self.tts + " "
         indent = len(ret)
-        ret += "** {}".format(self.msg)
+        ret += f"** {self.msg}"
         presenter = self.fields.get("presenter", self.fields.get("last-presenter"))
         if presenter:
-            ret += ", presenter = {}".format(presenter)
+            ret += f", presenter = {presenter}"
         #        conversation_id = self.fields.get("conversation-id")
         #        if conversation_id:
         #            ret += ", conversation-id = %s" % conversation_id
@@ -1631,7 +1756,7 @@ class LogMessage(Message):
                 "role",
                 "breakout-name",
             }:
-                ret += ' {}="{}"'.format(field.title(), self.fields[field])
+                ret += f' {field.title()}="{self.fields[field]}"'
             ret += "\n{}   Requested by {}".format(
                 " " * indent, self.fields["requester"]
             )
@@ -1646,7 +1771,7 @@ class LogMessage(Message):
             elif detail.startswith("["):
                 ret += "\n{}{}".format(" " * indent, detail)
             else:
-                ret += " ({})".format(detail)
+                ret += f" ({detail})"
         return ret
 
 
@@ -1678,7 +1803,7 @@ class ICEMessage(Message):
     def __str__(self):
         ret = self.tts + " "
         indent = len(ret)
-        ret += "** {}: ".format(self.msg)
+        ret += f"** {self.msg}: "
         ret += "Stream {} ({}), Component {}".format(
             self.fields.get("stream-id"),
             self.fields.get("media-type"),
@@ -1728,7 +1853,7 @@ class MediaMessage(Message):
 
     def __str__(self):
         ret = self.tts + " "
-        ret += "** {}: ".format(self.msg)
+        ret += f"** {self.msg}: "
         if "stream-id" in self.fields:
             ret += "Stream {} ({})".format(
                 self.fields.get("stream-id"), self.fields.get("media-type")
@@ -1826,7 +1951,7 @@ class ParticipantMediaStreamWindow(Message):
             for stream_id in sorted(
                 self.packet_loss_reports[stream_type].keys(), key=str
             ):
-                stream_name = "{}-{}".format(stream_type, stream_id)
+                stream_name = f"{stream_type}-{stream_id}"
 
                 last_packet_loss_report = {}
                 for packet_loss_report in self.packet_loss_reports[stream_type][
@@ -2051,21 +2176,17 @@ class VSRMessage(Message):
         )
         if stream_name:
             stream_name += " "
-        stream_name += "(sender ssrc: {}, remote ssrc: {})".format(
-            self.sender_ssrc, remote_ssrc
-        )
+        stream_name += f"(sender ssrc: {self.sender_ssrc}, remote ssrc: {remote_ssrc})"
         participant_id = self.tag_participant_map.get(self.msi)
         participant_name = self.participant_name_map.get(participant_id, "")
         if participant_name:
             if self.msg == "Sent VSR":
                 self.stream_id_participant_name_map[stream_id] = participant_name
             participant_name += " "
-        participant_name += "(msi: {})".format(self.msi)
+        participant_name += f"(msi: {self.msi})"
 
         ret = self.tts + " "
-        ret += "** {}: {} {} {}".format(
-            self.msg, stream_name, participant_name, self.mode_summary()
-        )
+        ret += f"** {self.msg}: {stream_name} {participant_name} {self.mode_summary()}"
         return ret
 
     def __eq__(self, other):
@@ -2117,7 +2238,7 @@ class DNSResponse(DNSMessage):
             ret += (ind * " ") + "=> "
             if "=>" in self.fields.get("path", ""):
                 for item in self.path():
-                    ret += "{} ({}) => ".format(item[1], item[0])
+                    ret += f"{item[1]} ({item[0]}) => "
             ret += self.result
         else:
             ret += ind * " "
@@ -2162,7 +2283,7 @@ class TCPMessage(Message):
                 self.local[0], self.local[1], self.remote[0], self.remote[1]
             )
         else:
-            ret += "-> {}:{}".format(self.remote[0], self.remote[1])
+            ret += f"-> {self.remote[0]}:{self.remote[1]}"
         if self.detail:
             ret += "\n{}({})".format(ind * " ", self.detail)
         return ret
@@ -2187,7 +2308,7 @@ class ExternalSpeakerMessage(Message):
                 participant_name = self.participant_name_map.get(participant_id, "")
                 if participant_name:
                     participant_name += " "
-                    participant_name += "({})".format(msi)
+                    participant_name += f"({msi})"
             else:
                 participant_name = "None"
             participant_names.append(participant_name)
@@ -2357,6 +2478,7 @@ def summarise(fi, fo, filter_name=None, protocol_filter=None, no_spam=False):
                     "support.gms",
                     "support.teams",
                     "dtmflatcher",
+                    "dtmf_latcher",
                 ]
             )
             and not (
@@ -2671,9 +2793,7 @@ def summarise(fi, fo, filter_name=None, protocol_filter=None, no_spam=False):
                     tts,
                     fields.get("detail"),
                 )
-                key = "{}:{}.{}:{}".format(
-                    msg.local[0], msg.local[1], msg.remote[0], msg.remote[1]
-                )
+                key = f"{msg.local[0]}:{msg.local[1]}.{msg.remote[0]}:{msg.remote[1]}"
                 if key in tcpmsgs:
                     tcpmsgs[key].append(msg)
                 else:
@@ -2687,6 +2807,12 @@ def summarise(fi, fo, filter_name=None, protocol_filter=None, no_spam=False):
         add_msg_to_calls(msg, calls, host)
 
     add_msgs_to_calls(coalesce_fragments(fragments.values()), calls)
+
+    for call in calls.values():
+        conversation_id = call.admin.get("conversation-id")
+        participant_id = call.admin.get_list("participant-id")
+        if conversation_id and participant_id:
+            conversation_map[conversation_id].update(set(participant_id))
 
     for call_id in list(calls):
         if call_id in call_map:
@@ -2733,5 +2859,5 @@ def summarise(fi, fo, filter_name=None, protocol_filter=None, no_spam=False):
 if __name__ == "__main__":
     try:
         main()
-    except (IOError, KeyboardInterrupt):
+    except (OSError, KeyboardInterrupt):
         pass
