@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import copy
+import ipaddress
 import json
 import operator
 import os
@@ -148,6 +149,24 @@ class DBAnalyser:
             else:
                 resp[row[join_index]] = [row[field]]
         return resp
+
+    def _resolve_configured_fqdn(self, target):
+        if not do_dns:
+            return None
+
+        ret = []
+        if target in self.cache:
+            return self.cache[target]
+
+        try:
+            ans = dns.resolver.resolve(target)
+        except Exception:
+            return []
+
+        for rec in ans:
+            ret.append(str(rec))
+        self.cache[target] = ret
+        return ret
 
     def _resolve_srv(self, target, service):
         if not do_dns:
@@ -701,6 +720,45 @@ class DBAnalyser:
         print()
         print("Other Issues")
         print("============")
+        if do_dns:
+            print("Configured FQDN Resolution:")
+            count = 0
+            data = {}
+            worker_address = None
+            worker_secondary_address = None
+            worker_static_nat_address = None
+            for worker in platform_workervm.values():
+                if not worker['alternative_fqdn']:
+                    continue
+                if worker['name'] not in data:
+                    data[worker['name']] = {}
+                if worker['address']:
+                    worker_address = ipaddress.ip_address(worker['address']).is_private
+                if worker['secondary_address']:
+                    worker_secondary_address = ipaddress.ip_address(worker['secondary_address']).is_private
+                if worker['static_nat_address']:
+                    worker_static_nat_address = ipaddress.ip_address(worker['static_nat_address']).is_private
+                res = {'hostname': worker['hostname'], 'address': worker['address'], 'worker_address': worker_address, 'secondary_address': worker['secondary_address'], 'worker_secondary_address': worker_secondary_address, 'static_nat_address': worker['static_nat_address'], 'worker_static_nat_address': worker_static_nat_address,'alternative_fqdn': worker['alternative_fqdn']}
+                data[worker['name']] = res
+            for item in data.values():
+                res = self._resolve_configured_fqdn(item['alternative_fqdn'])
+                if not item['worker_address']:
+                    if not res[0] == item['address']:
+                        print("=> %s primary address (%s) does not resolve to %s" % (item, item['address'], item['alternative_fqdn']))
+                        print("    => Result: %s" % (res[0]))
+                if not item['worker_secondary_address'] and item['worker_secondary_address'] != None:
+                    if not res[0] == item['secondary_address']:
+                        print("=> %s secondary address (%s) does not resolve to %s" % (item, item['secondary_address'], item['alternative_fqdn']))
+                        print("    => Result: %s" % (res[0]))
+                if not item['worker_static_nat_address'] and item['worker_static_nat_address'] != None:
+                    if not res[0] == item['static_nat_address']:
+                        print("=> %s static nat address (%s) does not resolve to %s" % (item['hostname'], item['static_nat_address'], item['alternative_fqdn']))
+                        print("    => Result: %s" % (res[0]))
+                    count += 1
+            if count == 0:
+                print("  None")
+            print()
+
         print("SIP TLS FQDN Clashes:")
         count = 0
         data = {}
