@@ -13,4 +13,4 @@ Pexip log processing tools, for processing logs and databases into easy-to-read 
  * `staticroutes.py` - Processes configuration database from a diagnostic snapshot into summary of conferencing node's static routes
  * `sync_pexscripts.sh` - Checks this repository for file updates and synchronises Pexip Log Tools on a user's PC (OSX).
  * `teamsload.py` - Processes history databases from a diagnostic snapshot if Teams Connector Enhanced Status is enabled ( Azure Event Hub )  and generates a utilization report of Teams Connector instances
- 
+ * `vmotion.py` - Processes the snapshot and generates a report if evidence of VMware vMotion use was found.
