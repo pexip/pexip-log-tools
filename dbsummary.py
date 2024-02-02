@@ -533,6 +533,8 @@ class DBAnalyser:
                             ans = dns.resolver.resolve(worker['sip_tls_fqdn'])
                         except Exception:
                             pass
+                    else:
+                        continue
 
                     targets = {x.address for x in ans}
                     if not targets:
