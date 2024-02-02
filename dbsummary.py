@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """dbsummary: extract key configuraton information into text format."""
 
-# Copyright 2023 Pexip AS
+# Copyright 2024 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -514,7 +514,7 @@ class DBAnalyser:
                 workers.append(data)
                 if worker['secondary_address']:
                     workers.append(['', worker['secondary_address'], '', worker['static_nat_address'] if worker['static_nat_address'] else '', '', '', '', '', '', ''])
-                worker_data.append({'node_type': node_type, 'static_nat': worker['static_nat_address'], 'sip_tls_fqdn': worker['alternative_fqdn']})
+                worker_data.append({'node_type': node_type, 'static_nat': worker['static_nat_address'], 'sip_tls_fqdn': worker['alternative_fqdn'], 'address': worker['address'], 'secondary_address': worker['secondary_address']})
 
             location_errors[loc['name']] = []
             if len({x['node_type'] for x in worker_data}) > 1:
@@ -523,6 +523,22 @@ class DBAnalyser:
                 location_errors[loc['name']].append("Only some nodes have Static NAT")
             if len({bool(x['sip_tls_fqdn']) for x in worker_data}) > 1:
                 location_errors[loc['name']].append("Only some nodes have SIP TLS FQDN")
+
+            if do_dns:
+                for worker in worker_data:
+                    addrs = {worker['address'], worker['secondary_address'], worker['static_nat']}
+                    ans = []
+                    if worker['sip_tls_fqdn']:
+                        try:
+                            ans = dns.resolver.resolve(worker['sip_tls_fqdn'])
+                        except Exception:
+                            pass
+
+                    targets = {x.address for x in ans}
+                    if not targets:
+                        location_errors[loc['name']].append("%s does not resolve" % (worker['sip_tls_fqdn'],))
+                    elif not targets & addrs:
+                        location_errors[loc['name']].append("%s does not resolve to a configured IP address" % (worker['sip_tls_fqdn'],))
 
             print()
             print("Conferencing Nodes : %d" % len(worker_data))
