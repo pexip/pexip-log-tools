@@ -362,6 +362,13 @@ class DBAnalyser:
             print()
             print("Logs set to debug: " + ', '.join(debuglogs))
 
+        if 'default_webapp_alias_id' in platform_global:
+            platform_webappalias = self._builddict(self.configuration, 'platform_webappalias', ('slug', 'webapp_type'), 'id')
+            defaultalias = platform_webappalias[platform_global['default_webapp_alias_id']]
+            print("Default webapp: /%s (%s)" % (defaultalias['slug'], defaultalias['webapp_type'].capitalize()))
+        elif 'default_to_new_webapp' in platform_global:
+            print("Default webapp: " + ("Webapp2" if platform_global['default_to_new_webapp'] else "Webapp1"))
+
         blob = {'locations':{}}
 
         location_errors = {}
