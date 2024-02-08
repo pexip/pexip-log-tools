@@ -783,8 +783,8 @@ function Unprotect-PexFile {
 
                     # Use the GNU tool 'file.exe' to determine if the file is readable as a non 'data' file.
                     # If not, then decryption probably failed so restore the file.
-                    # PCAPNG files (Wireshark), will still read as data files, so ignore checking those.
-                    if (((& $PathToFile $FileItem | Select-String -pattern "; data" -quiet) -eq $true) -and ($FileItem.Extension -ne ".pcap"))
+                    # PCAPNG and PCAP files (Wireshark), will still read as data files, so ignore checking those.
+                    if (((& $PathToFile $FileItem | Select-String -pattern "; data" -quiet) -eq $true) -and ($FileItem.Extension -notin ".pcap", ".pcapng"))
                     {
                         Write-Warning "The file did not decrypt properly, the key may be wrong."
                         Write-Warning "Restoring original file and exiting."
