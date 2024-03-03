@@ -107,17 +107,6 @@ if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
         esac
     done
 
-    # Check for Sublime Text & install if we don't have it
-    #if [[ $(which -s subl) == "subl not found" ]] ; then
-    #    # Make sure we’re using the latest Homebrew & Upgrade any already-installed formulae.
-    #    brew update && brew upgrade
-    #    echo 'Installing Sublime Text...'
-    #    curl --silent -L -o ~/pexscripts/pex-supportlog.tmLanguage https://www.dropbox.com/s/lczo05e2ti10dme/pex-supportlog.tmLanguage\?dl=1
-    #    brew install --appdir="/Applications" sublime-text
-    #    sudo mkdir -p ~/Library/Application\ Support/Sublime\ Text\ 3/Packages/User && sudo chown -R $USER ~/Library/Application\ Support/Sublime\ Text\ 3
-    #    sudo ln -sf ~/pexscripts/pex-supportlog.tmLanguage ~/Library/Application\ Support/Sublime\ Text\ 3/Packages/User/pex-supportlog.tmLanguage
-    #fi
-
     # Check for pip3 & install if we don't have it so we can install lxml (required for logreader)
     if [[ $(which -s pip3) == "pip3 not found" ]] ; then
         echo 'Installing pip3 & lxml...'
@@ -136,6 +125,12 @@ if [[ ! $EUID -ne 0 ]]; then
 else
     chown -R $USER ~/pexscripts && chmod 700 ~/pexscripts
 fi
+# chmod
+for i in "${arr[@]}"
+do
+    sudo ln -sf ~/pexscripts/$i /usr/local/bin/${i%.py}
+    sudo chmod +x ~/pexscripts/$i && sudo chown -R $USER /usr/local/bin/${i%.py}
+done
 echo 'Done'
 
 if [[ $code_installed -eq 1 ]]; then
