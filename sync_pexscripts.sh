@@ -25,7 +25,7 @@ sudo -v
 
 # Create local storage directory & download Pexip scripts.
 # Set Pexip script array
-declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexauthconfig.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
+declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexauthconfig.py" "pexidpconfig.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
 
 # Create local directory
 if [[ ! -e ~/pexscripts ]]; then
