@@ -28,6 +28,10 @@ import os
 import sqlite3
 import sys
 
+# pylint: disable=missing-class-docstring
+# pylint: disable=missing-function-docstring
+# pylint: disable=line-too-long
+
 class PexAuth:
     """PexAuth class for managing Pexip authentication configuration"""
 
@@ -45,13 +49,13 @@ class PexAuth:
             self.defaultdb = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/config/default.db'))
             self.defaultdb.row_factory = sqlite3.Row
         except sqlite3.OperationalError as e:
-            print('FATAL: %s' % (e))
-            print('Usage: %s <snapshot folder>' % (os.path.basename(__file__)))
+            print(f"FATAL: {e}")
+            print(f"Usage: {(os.path.basename(__file__))} <snapshot folder>")
             sys.exit(2)
         if os.path.exists(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json')):
-            self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json'), 'r'))
+            self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json'), 'r', encoding='utf-8'))
         else:
-            self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/share/web/static/version/version.json'), 'r'))
+            self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/share/web/static/version/version.json'), 'r', encoding='utf-8'))
         if self.version['version-id'] <= '24':
             print('This script is only compatible with version 24 or higher')
             sys.exit(2)
@@ -89,14 +93,14 @@ class PexAuth:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute("select * from %s" % table)
+        cur.execute(f"select * from {table}")
         for row in cur:
             data = {}
             for field in fields:
                 data[field] = row[field] if field in row.keys() else ''
             resp[row[key]] = data
         return resp
-    
+
 
     def _build_dict_join(self, db, join_table, join_index, join_field, table, field):
         """
@@ -115,8 +119,7 @@ class PexAuth:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute("select %s.%s as %s, %s.%s as %s from %s left join %s on %s.%s == %s.id" %
-                    (join_table, join_index, join_index, table, field, field, join_table, table, join_table, join_field, table))
+        cur.execute(f"select {join_table}.{join_index} as {join_index}, {table}.{field} as {field} from {join_table} left join {table} on {join_table}.{join_field} == {table}.id")
         for row in cur:
             if row[join_index] in resp:
                 resp[row[join_index]].append(row[field])
@@ -126,10 +129,10 @@ class PexAuth:
 
 
     def print_auth_config(self):
-        issues = []
         """
         Print the authentication configuration.
         """
+        issues = []
         auth_config = self.permissions_authentication_table[1]
         print(f"Platform Version: {self.version['version-id']} ({self.version['pseudo-version']})")
         print()
@@ -148,7 +151,7 @@ class PexAuth:
             print(f'Allow all permissions: {str(auth_config["api_oauth2_allow_all_perms"]).replace("0", "No").replace("1", "Yes")}')
             print()
         if 'LDAP' in auth_config['source']:
-            print('LDAP configuration') 
+            print('LDAP configuration')
             print(len('LDAP configuration') * '=')
             print()
             print(f'LDAP server: {auth_config["ldap_server"]}')

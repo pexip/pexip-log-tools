@@ -98,6 +98,10 @@ external_scripts = {
         'logfile':'pex_report_hitcounter.log',
         'script':script_location+'/pexhitcounter.py'
     },
+    'idp_configuration': {
+        'logfile':'pex_report_idpconfig.log',
+        'script':script_location+'/pexidpconfig.py'
+    },
     'logreader': {
         'logfile':'pex_report_logreader.log',
         'script':script_location+'/logreader.py'
