@@ -25,7 +25,7 @@ sudo -v
 
 # Create local storage directory & download Pexip scripts.
 # Set Pexip script array
-declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
+declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexauthconfig.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
 
 # Create local directory
 if [[ ! -e ~/pexscripts ]]; then
@@ -49,6 +49,7 @@ curl --silent -L -o ~/pexscripts/dbsummary.py https://raw.githubusercontent.com/
 curl --silent -L -o ~/pexscripts/logreader.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/logreader.py
 curl --silent -L -o ~/pexscripts/mjxsummary.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/mjxsummary.py
 curl --silent -L -o ~/pexscripts/staticroutes.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/staticroutes.py
+curl --silent -L -o ~/pexscripts/pexauthconfig.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexauthconfig.py
 curl --silent -L -o ~/pexscripts/pexsnap.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexsnap.py
 curl --silent -L -o ~/pexscripts/pexwebapps.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexwebapps.py
 curl --silent -L -o ~/pexscripts/sync_pexscripts.sh https://raw.githubusercontent.com/pexip/pexip-log-tools/master/sync_pexscripts.sh
