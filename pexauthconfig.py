@@ -17,7 +17,7 @@
 """
 USAGE:
 
-pexauth.py <snapshot folder>
+pexauthconfig.py <snapshot folder>
 
 This script outputs the authentication configuration of a Pexip snapshot.
 """
