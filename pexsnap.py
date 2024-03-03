@@ -74,6 +74,10 @@ code_path = '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/cod
 subl_path = '/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl'
 
 external_scripts = {
+    'auth_configuration': {
+        'logfile':'pex_report_authconfig.log',
+        'script':script_location+'/pexauthconfig.py'
+    },
     'conference_history': {
         'logfile':'pex_report_confhistory.log',
         'script':script_location+'/confhistory.py'
