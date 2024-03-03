@@ -50,6 +50,7 @@ curl --silent -L -o ~/pexscripts/logreader.py https://raw.githubusercontent.com/
 curl --silent -L -o ~/pexscripts/mjxsummary.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/mjxsummary.py
 curl --silent -L -o ~/pexscripts/staticroutes.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/staticroutes.py
 curl --silent -L -o ~/pexscripts/pexauthconfig.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexauthconfig.py
+curl --silent -L -o ~/pexscripts/pexidpconfig.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexidpconfig.py
 curl --silent -L -o ~/pexscripts/pexsnap.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexsnap.py
 curl --silent -L -o ~/pexscripts/pexwebapps.py https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexwebapps.py
 curl --silent -L -o ~/pexscripts/sync_pexscripts.sh https://raw.githubusercontent.com/pexip/pexip-log-tools/master/sync_pexscripts.sh
