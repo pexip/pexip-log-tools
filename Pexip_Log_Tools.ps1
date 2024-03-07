@@ -1,4 +1,4 @@
-# Copyright 2023 Pexip AS
+# Copyright 2024 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,13 +50,19 @@ $vMotionScript = "C:\Tools\Scripts\detect_vMotion.py"
 $ConfHistoryScript = "C:\Tools\Scripts\confhistory.py"
 $ConnectivityScript = "C:\Tools\Scripts\connectivity.py"
 $MJXScript = "C:\Tools\Scripts\mjxsummary.py"
-$OutputFolder = "C:\Tools\Scripts\Output\"
+$WebappScript = "C:\Tools\Scripts\pexwebapps.py"
+$IdPScript = "C:\Tools\Scripts\pexidpconfig.py"
+$AuthScript = "C:\Tools\Scripts\pexauthconfig.py"
 
+$OutputFolder = "C:\Tools\Scripts\Output\"
 $LogReaderError = "LogReaderError.txt"
 $DBSummaryError ="DBSummaryError.txt"
 $ConfHistoryError = "ConfHistoryError.txt"
 $ConnectivityError = "ConnectivityError.txt"
 $MJXError = "MJXError.txt"
+$WebappError = "WebappError.txt"
+$IdPError = "IdPError.txt"
+$AuthError = "AuthError.txt"
 
 $SupportLog = "support.log"
 $DeveloperLog = "developer.log"
@@ -72,6 +78,9 @@ $MJXReport = "Pex_Report_MJXSummary.txt"
 $IrregularPulseText = "Pex_Health_Irregular_Pulse.txt"
 $IrregularPingText = "Pex_Health_Irregular_Ping.txt"
 $RectorStallingText = "Pex_Health_Reactor_Stalling.txt"
+$WebappReport = "Pex_Report_WebappsSummary.txt"
+$IdPReport = "Pex_Report_IdPSummary.txt"
+$AuthReport = "Pex_Report_AuthConfigSummary.txt"
 
 $env:PYTHONIOENCODING="UTF-8"
 $SnapArray = @()
@@ -102,8 +111,9 @@ function Test-PexEnvironment {
 
                 if (-not (Test-Path $fullPath)) {
                     Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please re-install the missing file in either of these locations and try again. If grepwin was recently installed, restart your PC."
-					Read-Host
-					exit 1  # Exit with an error code to indicate a problem
+		    Read-Host
+		    exit 1  # Exit with an error code to indicate a problem
+      
                 } else {
                     # Update global variables with the full path
                     if ($appName -eq "Notepad++") {
@@ -764,37 +774,36 @@ function Unprotect-PexFile {
                 Move-Item -Path $FileItem -Destination "$($FileItem.FullName).bak"
                 Write-Host "The file appears to be encrypted. Please Enter the key to decrypt the file :" $FileItem.Name
                 Write-Host
-                $Result = ($host.ui.ReadLine()).TrimEnd()
-					
-				try {
-					# Attempt to decrypt the file and monitor messages outputed to the console 
-					$output = & openssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak" 2>&1
+                $Result = ($host.ui.ReadLine()).TrimEnd()	
+		try {
+			# Attempt to decrypt the file and monitor messages outputed to the console 
+			$output = & openssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak" 2>&1
 
-					# Check if the output contains "bad decrypt"
-					if ($output -match "bad decrypt") {
-						Write-Host	
-						Write-Warning "The file did not decrypt properly, the key may be wrong."
-						Write-Warning "Restoring original file and exiting."
-						Write-Host
-						Remove-Item $FileItem
-                       				Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
-                       				pause
-                        			Exit 0
-						}
-					else {
-						Write-Host
-                        			Write-Host "Decryption Complete."
-                        			Remove-Item "$($FileItem.FullName).bak"
-						}
-					}	 
-				catch {
-					Write-Warning "The file did not decrypt properly, the key may be wrong."
-                        		Write-Warning "Restoring original file and exiting."
-                        		Remove-Item $FileItem
-                        		Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
-                        		pause
-                        		Exit 0
-					}
+			# Check if the output contains "bad decrypt"
+			if ($output -match "bad decrypt") {
+			Write-Host	
+			Write-Warning "The file did not decrypt properly, the key may be wrong."
+			Write-Warning "Restoring original file and exiting."
+			Write-Host
+			Remove-Item $FileItem
+                       	Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
+                       	pause
+                        Exit 0
+			}
+			else {
+				Write-Host
+                        	Write-Host "Decryption Complete."
+                        	Remove-Item "$($FileItem.FullName).bak"
+				}
+			}	 
+   		catch {
+			Write-Warning "The file did not decrypt properly, the key may be wrong."
+                       	Write-Warning "Restoring original file and exiting."
+                    	Remove-Item $FileItem
+                	Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
+                	pause
+                        Exit 0
+			}
                 }
             }
         }
@@ -878,6 +887,9 @@ else {
                 $ConfHistoryFile = New-PexSummary -Snapfolders $SnapFolder -ScriptFile $ConfHistoryScript -ReportFile $ConfHistoryReport -SummaryError $ConfHistoryError
                 New-PexSummary -Snapfolders $SnapFolder -ScriptFile $ConnectivityScript -ReportFile $ConnectivityReport -SummaryError $ConnectivityError | Out-Null
                 New-PexSummary -Snapfolders $SnapFolder -ScriptFile $MJXScript -ReportFile $MJXReport -SummaryError $MJXError | Out-Null
+		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
+  		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
+    		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
             }
     
             else {
@@ -937,6 +949,10 @@ else {
                 $ConfHistoryFile = New-PexSummary -Snapfolders $_ -ScriptFile $ConfHistoryScript -ReportFile $ConfHistoryReport -SummaryError $ConfHistoryError
                 New-PexSummary -Snapfolders $_ -ScriptFile $ConnectivityScript -ReportFile $ConnectivityReport -SummaryError $ConnectivityError | Out-Null
                 New-PexSummary -Snapfolders $_ -ScriptFile $MJXScript -ReportFile $MJXReport -SummaryError $MJXError | Out-Null
+		New-PexSummary -Snapfolders $_ -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
+		New-PexSummary -Snapfolders $_ -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
+		New-PexSummary -Snapfolders $_ -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
+		
             }
             else {
                 $DBSummaryFile = $false
