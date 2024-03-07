@@ -50,8 +50,8 @@ class PexIdPConfig:
             self.configurationdb = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/config/conferencing_configuration.db'))
             self.configurationdb.row_factory = sqlite3.Row
         except sqlite3.OperationalError as e:
-            print(f"FATAL: {e}")
-            print(f"Usage: {(os.path.basename(__file__))} <snapshot folder>")
+            print(f'FATAL: {e}')
+            print(f'Usage: {(os.path.basename(__file__))} <snapshot folder>')
             sys.exit(2)
         if os.path.exists(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json')):
             self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json'), 'r', encoding='utf-8'))
@@ -87,7 +87,7 @@ class PexIdPConfig:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute(f"select * from {table}")
+        cur.execute(f'select * from {table}')
         for row in cur:
             data = {}
             for field in fields:
@@ -113,7 +113,7 @@ class PexIdPConfig:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute(f"select {join_table}.{join_index} as {join_index}, {table}.{field} as {field} from {join_table} left join {table} on {join_table}.{join_field} == {table}.id")
+        cur.execute(f'select {join_table}.{join_index} as {join_index}, {table}.{field} as {field} from {join_table} left join {table} on {join_table}.{join_field} == {table}.id')
         for row in cur:
             if row[join_index] in resp:
                 resp[row[join_index]].append(row[field])
@@ -127,56 +127,56 @@ class PexIdPConfig:
         Print the IdP configuration.
         """
         if not self.platform_identityprovider_table:
-            print("No identity providers configured")
+            print('No identity providers configured')
             return
         auth_config = self.platform_identityprovider_table
         additional_consumers = []
-        print(f"Platform Version: {self.version['version-id']} ({self.version['pseudo-version']})")
+        print(f'Platform Version: {self.version["version-id"]} ({self.version["pseudo-version"]})')
         print()
         for idx, provider in enumerate(auth_config.values(), start=1):
             for key, value in provider.items():
                 if key.startswith('assertion_consumer_service_url') and value:
                     additional_consumers.append(value)
             additional_consumers.pop(0)
-            print(f"Identity Provider #{idx} - {provider['name']} ({provider['description']})") if provider['description'] else print(f"Identity Provider #{idx} - {provider['name']}")
-            print(len(f'Identity Provider #{idx} - {provider['name']} ({provider['description']})') * '=') if provider['description'] else print(len(f'Identity Provider #{idx} - {provider['name']}') * '=')
+            print(f'Identity Provider #{idx} - {provider["name"]} ({provider["description"]})') if provider["description"] else print(f'Identity Provider #{idx} - {provider["name"]}')
+            print(len(f'Identity Provider #{idx} - {provider["name"]} ({provider["description"]})') * '=') if provider["description"] else print(len(f'Identity Provider #{idx} - {provider["name"]}') * '=')
             if 'saml' in provider['idp_type']:
-                print("> Service Configuration")
-                print(f"  - Type: {provider['idp_type'].upper()}")
-                print(f"  - UUID: {provider['uuid']}")
-                print(f"  - Redirect URL: {provider['assertion_consumer_service_url']}")
-                print(f"  - SAML 2.0 entity ID: {provider['service_entity_id']}")
-                print(f"  - Signature algorithm: {provider['oidc_token_signature_scheme']}")
-                print(f"  - Digest algorithm: {provider['digest_algorithm'].split('#')[-1]}")
+                print('> Service Configuration')
+                print(f'  - Type: {provider["idp_type"].upper()}')
+                print(f'  - UUID: {provider["uuid"]}')
+                print(f'  - Redirect URL: {provider["assertion_consumer_service_url"]}')
+                print(f'  - SAML 2.0 entity ID: {provider["service_entity_id"]}')
+                print(f'  - Signature algorithm: {provider["oidc_token_signature_scheme"]}')
+                print(f'  - Digest algorithm: {provider["digest_algorithm"].split("#")[-1]}')
                 print()
             else:
-                print("> Service Configuration")
-                print(f"  - Type: {provider['idp_type'].upper()}")
-                print(f"  - UUID: {provider['uuid']}")
-                print(f"  - Redirect URL: {provider['assertion_consumer_service_url']}")
-                print(f"  - OIDC flow: {provider['oidc_flow']}")
-                print(f"  - OIDC client ID: {provider['oidc_client_id']}")
+                print('> Service Configuration')
+                print(f'  - Type: {provider["idp_type"].upper()}')
+                print(f'  - UUID: {provider["uuid"]}')
+                print(f'  - Redirect URL: {provider["assertion_consumer_service_url"]}')
+                print(f'  - OIDC flow: {provider["oidc_flow"]}')
+                print(f'  - OIDC client ID: {provider["oidc_client_id"]}')
                 print()
-                print(f"  - OIDC token endpoint auth type: {provider['oidc_token_endpoint_auth_scheme']}")
-                print(f"  - OIDC token signature scheme: {provider['oidc_token_signature_scheme']}")
-                print(f"  - OIDC user info endpoint URL: {provider['oidc_user_info_url']}")
-                print(f"  - OIDC France Connect required EIDAS Level: {provider['oidc_france_connect_required_eidas_level'].capitalize()}")
+                print(f'  - OIDC token endpoint auth type: {provider["oidc_token_endpoint_auth_scheme"]}')
+                print(f'  - OIDC token signature scheme: {provider["oidc_token_signature_scheme"]}')
+                print(f'  - OIDC user info endpoint URL: {provider["oidc_user_info_url"]}')
+                print(f'  - OIDC France Connect required EIDAS Level: {provider["oidc_france_connect_required_eidas_level"].capitalize()}')
                 print()
             if additional_consumers:
                 print(f'> Additional redirect URLs ({len(additional_consumers)}):')
                 for consumer in additional_consumers:
-                    print(f"  - {consumer}")
+                    print(f'  - {consumer}')
                 print()
-            print("> Identity Provider Configuration")
-            print(f"  - SSO URL: {provider['sso_url']}")
+            print('> Identity Provider Configuration')
+            print(f'  - SSO URL: {provider["sso_url"]}')
             if 'oidc' in provider['idp_type']:
-                print(f"  - OIDC token endpoint URL: {provider['oidc_token_url']}")
-                print(f"  - OIDC JWKS URL: {provider['oidc_jwks_url']}")
-            print(f"  - Entity ID: {provider['idp_entity_id']}")
+                print(f'  - OIDC token endpoint URL: {provider["oidc_token_url"]}')
+                print(f'  - OIDC JWKS URL: {provider["oidc_jwks_url"]}')
+            print(f'  - Entity ID: {provider["idp_entity_id"]}')
             if 'oidc' in provider['idp_type']:
-                print(f"  - OIDC display name claim name: {provider['oidc_display_name_claim_name']}")
+                print(f'  - OIDC display name claim name: {provider["oidc_display_name_claim_name"]}')
             else:
-                print(f"  - Display name attribute: {provider['display_name_attribute_name']}")
+                print(f'  - Display name attribute: {provider["display_name_attribute_name"]}')
             print()
             additional_consumers = []
             if self.version['major'] >= 33:
@@ -185,18 +185,18 @@ class PexIdPConfig:
                     print()
                 except:
                     pass
-        print("Identity Provider Groups")
-        print(len("Identity Provider Groups") * '=')
+        print('Identity Provider Groups')
+        print(len('Identity Provider Groups') * '=')
         print()
         services = []
         for idx, group in enumerate(self.platform_identityprovider_group_table.values(), start=1):
-            print(f"> Identity Provider Group #{idx} - {group['name']} ({group['description']})") if group['description'] else print(f"> Identity Provider Group #{idx} - {group['name']}")
-            print(f"  - Identity Providers ({len(self.platform_identityprovidergroup_identity_provider_table_join[group['id']])}): {', '.join(self.platform_identityprovidergroup_identity_provider_table_join[group['id']])}")
+            print(f'> Identity Provider Group #{idx} - {group["name"]} ({group["description"]})') if group["description"] else print(f'> Identity Provider Group #{idx} - {group["name"]}')
+            print(f'  - Identity Providers ({len(self.platform_identityprovidergroup_identity_provider_table_join[group["id"]])}): {", ".join(self.platform_identityprovidergroup_identity_provider_table_join[group["id"]])}')
             for service in self.conferencing_conference_table:
                 if self.conferencing_conference_table[service]['guest_identity_provider_group_id'] == group['id'] or self.conferencing_conference_table[service]['host_identity_provider_group_id'] == group['id']:
                     services.append(self.conferencing_conference_table[service]['name'])
             if services:
-                print(f"  - Configured Services ({len(services)}): {', '.join(services)}")
+                print(f'  - Configured Services ({len(services)}): {", ".join(services)}')
                 services = []
             print()
         self.configurationdb.close()

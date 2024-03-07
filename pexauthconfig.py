@@ -49,8 +49,8 @@ class PexAuth:
             self.defaultdb = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/config/default.db'))
             self.defaultdb.row_factory = sqlite3.Row
         except sqlite3.OperationalError as e:
-            print(f"FATAL: {e}")
-            print(f"Usage: {(os.path.basename(__file__))} <snapshot folder>")
+            print(f'FATAL: {e}')
+            print(f'Usage: {(os.path.basename(__file__))} <snapshot folder>')
             sys.exit(2)
         if os.path.exists(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json')):
             self.version = json.load(open(os.path.join(rootdir, 'opt/pexip/lib/python2.7/site-packages/si/web/management/conf/static/version.json'), 'r', encoding='utf-8'))
@@ -93,7 +93,7 @@ class PexAuth:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute(f"select * from {table}")
+        cur.execute(f'select * from {table}')
         for row in cur:
             data = {}
             for field in fields:
@@ -119,7 +119,7 @@ class PexAuth:
         """
         resp = {}
         cur = db.cursor()
-        cur.execute(f"select {join_table}.{join_index} as {join_index}, {table}.{field} as {field} from {join_table} left join {table} on {join_table}.{join_field} == {table}.id")
+        cur.execute(f'select {join_table}.{join_index} as {join_index}, {table}.{field} as {field} from {join_table} left join {table} on {join_table}.{join_field} == {table}.id')
         for row in cur:
             if row[join_index] in resp:
                 resp[row[join_index]].append(row[field])
@@ -134,12 +134,12 @@ class PexAuth:
         """
         issues = []
         auth_config = self.permissions_authentication_table[1]
-        print(f"Platform Version: {self.version['version-id']} ({self.version['pseudo-version']})")
+        print(f'Platform Version: {self.version["version-id"]} ({self.version["pseudo-version"]})')
         print()
         print('Administrator Authentication Configuration')
         print(len('Administrator Authentication Configuration') * '=')
         print()
-        print(f'Authentication source: {auth_config['source']}')
+        print(f'Authentication source: {auth_config["source"]}')
         print(f'Require client certificate: {str(auth_config["client_certificate"]).capitalize()}')
         print()
         if self.version['version-id'] >= '34':
@@ -156,7 +156,7 @@ class PexAuth:
             print()
             print(f'LDAP server: {auth_config["ldap_server"]}')
             print(f'LDAP bind username: {auth_config["ldap_bind_username"]}')
-            print(f'LDAP bind password: {auth_config["ldap_bind_password"][:20]}......')
+            print(f'LDAP bind password: {auth_config["ldap_bind_password"][:20]}..REDACTED')
             print(f'LDAP base DN: {auth_config["ldap_base_dn"]}')
             print(f'Allow insecure transport (no TLS): {str(auth_config["ldap_permit_no_tls"]).replace("0", "No").replace("1", "Yes")}')
             if not auth_config["ldap_base_dn"]:
@@ -209,29 +209,29 @@ class PexAuth:
                 print('OpenID Connect metadata')
                 print(len('OpenID Connect metadata') * '=')
                 print()
-                print(f'Token endpoint: {metadata['token_endpoint']}')
-                print(f'Token endpoint auth methods supported: {metadata['token_endpoint_auth_methods_supported']}')
-                print(f'JWKS URI: {metadata['jwks_uri']}')
-                print(f'Response modes supported: {metadata['response_modes_supported']}')
-                print(f'Subject types supported: {metadata['subject_types_supported']}')
-                print(f'ID token signing alg values supported: {metadata['id_token_signing_alg_values_supported']}')
-                print(f'Response types supported: {metadata['response_types_supported']}')
-                print(f'Supported scopes: {metadata['scopes_supported']}')
-                print(f'Issuer: {metadata['issuer']}')
-                print(f'Request URI parameter supported: {metadata['request_uri_parameter_supported']}')
-                print(f'User info endpoint: {metadata['userinfo_endpoint']}')
-                print(f'Authorization endpoint: {metadata['authorization_endpoint']}')
-                print(f'Device authorization endpoint: {metadata['device_authorization_endpoint']}')
-                print(f'HTTP logout supported: {metadata['http_logout_supported']}')
-                print(f'Front channel logout supported: {metadata['frontchannel_logout_supported']}')
-                print(f'End session endpoint: {metadata['end_session_endpoint']}')
-                print(f'Claims supported: {metadata['claims_supported']}')
-                print(f'Kerberos endpoint: {metadata['kerberos_endpoint']}')
-                print(f'Tenant region scope: {metadata['tenant_region_scope']}')
-                print(f'Cloud instance name: {metadata['cloud_instance_name']}')
-                print(f'Cloud graph hostname: {metadata['cloud_graph_host_name']}')
-                print(f'Microsoft Graph URI: {metadata['msgraph_host']}')
-                print(f'RBAC URL: {metadata['rbac_url']}')
+                print(f'Token endpoint: {metadata["token_endpoint"]}')
+                print(f'Token endpoint auth methods supported: {metadata["token_endpoint_auth_methods_supported"]}')
+                print(f'JWKS URI: {metadata["jwks_uri"]}')
+                print(f'Response modes supported: {metadata["response_modes_supported"]}')
+                print(f'Subject types supported: {metadata["subject_types_supported"]}')
+                print(f'ID token signing alg values supported: {metadata["id_token_signing_alg_values_supported"]}')
+                print(f'Response types supported: {metadata["response_types_supported"]}')
+                print(f'Supported scopes: {metadata["scopes_supported"]}')
+                print(f'Issuer: {metadata["issuer"]}')
+                print(f'Request URI parameter supported: {metadata["request_uri_parameter_supported"]}')
+                print(f'User info endpoint: {metadata["userinfo_endpoint"]}')
+                print(f'Authorization endpoint: {metadata["authorization_endpoint"]}')
+                print(f'Device authorization endpoint: {metadata["device_authorization_endpoint"]}')
+                print(f'HTTP logout supported: {metadata["http_logout_supported"]}')
+                print(f'Front channel logout supported: {metadata["frontchannel_logout_supported"]}')
+                print(f'End session endpoint: {metadata["end_session_endpoint"]}')
+                print(f'Claims supported: {metadata["claims_supported"]}')
+                print(f'Kerberos endpoint: {metadata["kerberos_endpoint"]}')
+                print(f'Tenant region scope: {metadata["tenant_region_scope"]}')
+                print(f'Cloud instance name: {metadata["cloud_instance_name"]}')
+                print(f'Cloud graph hostname: {metadata["cloud_graph_host_name"]}')
+                print(f'Microsoft Graph URI: {metadata["msgraph_host"]}')
+                print(f'RBAC URL: {metadata["rbac_url"]}')
                 print()
         if 'LDAP' in auth_config['source'] or 'OIDC' in auth_config['source']:
             role_mapping = self.authentication_role_mapping_table
@@ -247,8 +247,8 @@ class PexAuth:
                 if role_mapping_permissions.keys():
                     permissions = ''
                     for permission in role_mapping_permissions[item['id']]:
-                        permissions += f"{permission}, "
-                    print(f"    Administrator roles: {permissions[:-1].removesuffix(',')}")
+                        permissions += f'{permission}, '
+                    print(f'    Administrator roles: {permissions[:-1].removesuffix(",")}')
                     print()
         if self.version['version-id'] == '34':
             if self.permissions_oauth2client_table:
@@ -258,8 +258,8 @@ class PexAuth:
                 for idx, item in enumerate(self.permissions_oauth2client_table.values(), start=1):
                     print(f'OAuth2 client #{idx}: {item["client_name"]}')
                     print(f'    Client ID: {item["client_id"]}')
-                    print(f"    Administrator role: {self.permissions_oauth2token_table[item['id']][0]}")
-                    print(f"    LDAP group dn: {self.authentication_role_mapping_table[[item['role_id']][0]]['ldap_group_dn']}")
+                    print(f'    Administrator role: {self.permissions_oauth2token_table[item["id"]][0]}')
+                    print(f'    LDAP group dn: {self.authentication_role_mapping_table[[item["role_id"]][0]]["ldap_group_dn"]}')
                     print()
         if self.version['version-id'] >= '35':
             if self.permissions_oauth2client_table:
@@ -269,8 +269,8 @@ class PexAuth:
                 for idx, item in enumerate(self.permissions_oauth2client_table.values(), start=1):
                     print(f'OAuth2 client #{idx}: {item["client_name"]}')
                     print(f'    Client ID: {item["client_id"]}')
-                    print(f"    Administrator role: {self.permissions_oauth2token_table[item['id']][0]}")
-                    print(f"    Role mapping: {self.authentication_role_mapping_table[[item['role_id']][0]]['value']}")
+                    print(f'    Administrator role: {self.permissions_oauth2token_table[item["id"]][0]}')
+                    print(f'    Role mapping: {self.authentication_role_mapping_table[[item["role_id"]][0]]["value"]}')
                     print()
         if self.version['version-id'] >= '34':
             if self.permissions_oauth2tokens_table:
@@ -278,7 +278,7 @@ class PexAuth:
                 print(len('OAuth2 Tokens') * '=')
                 print()
                 for idx, item in enumerate(self.permissions_oauth2tokens_table.values(), start=1):
-                    print(f'OAuth2 token #{idx}: {self.permissions_oauth2client_table[item["client_id"]]['client_name']} (ID: {self.permissions_oauth2client_table[item["client_id"]]['client_id']})')
+                    print(f'OAuth2 token #{idx}: {self.permissions_oauth2client_table[item["client_id"]]["client_name"]} (ID: {self.permissions_oauth2client_table[item["client_id"]]["client_id"]})')
                     print(f'    Token type: {item["token_type"]}')
                     print(f'    Scope: {item["scope"]}')
                     print(f'    Issued at: {item["issued_at"]}')
@@ -291,15 +291,15 @@ class PexAuth:
         print()
         for idx, item in enumerate(role_config.values(), start=1):
             permissions = ''
-            print(f'Administrator role #{idx}: {item['name']}')
+            print(f'Administrator role #{idx}: {item["name"]}')
             if self.authentication_group_permission_table.keys():
                 for permission in self.authentication_group_permission_table[item['id']]:
-                    permissions += f"{permission}, "
-            print(f"    Permissions ({len(permissions[:-1].removesuffix(',').split(','))}): {permissions[:-1].removesuffix(',')}")
+                    permissions += f'{permission}, '
+            print(f'    Permissions ({len(permissions[:-1].removesuffix(",").split(","))}): {permissions[:-1].removesuffix(",")}')
             print()
         if issues:
-            print("Potential Issues")
-            print(len("Potential Issues") * '=')
+            print('Potential Issues')
+            print(len('Potential Issues') * '=')
             print()
             for issue in issues:
                 print(issue)
