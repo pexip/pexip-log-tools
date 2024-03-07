@@ -70,7 +70,7 @@ class PexAuth:
             self.authentication_role_mapping_permission_table = self._build_dict_join(self.defaultdb, 'permissions_ldaprole_roles', 'ldaprole_id', 'role_id', 'auth_group', 'name')
         if self.version['version-id'] == '34':
             self.permissions_oauth2client_table = self._build_dict(self.defaultdb, 'permissions_oauth2client', ('id', 'client_id', 'client_name', 'public_key_jwt', 'role_id'), 'id')
-            self.permissions_oauth2token_table = self._build_dict_join(self.defaultdb, 'permissions_oauth2client', 'id', 'role_id', 'permissions_ldaprole', 'name')
+            self.permissions_oauth2token_table = self._build_dict_join(self.defaultdb, 'permissions_oauth2client', 'id', 'role_id', 'auth_group', 'name')
         if self.version['version-id'] >= '35':
             self.permissions_oauth2client_table = self._build_dict(self.defaultdb, 'permissions_oauth2client', ('id', 'client_id', 'client_name', 'public_key_jwt', 'role_id'), 'id')
             self.permissions_oauth2token_table = self._build_dict_join(self.defaultdb, 'permissions_oauth2client', 'id', 'role_id', 'permissions_rolemapping', 'name')
@@ -285,7 +285,8 @@ class PexAuth:
                 print()
                 for idx, item in enumerate(self.permissions_oauth2tokens_table.values(), start=1):
                     print(f'OAuth2 token #{idx}: {self.permissions_oauth2client_table[item["client_id"]]["client_name"]} (ID: {self.permissions_oauth2client_table[item["client_id"]]["client_id"]})')
-                    print(f'    Token type: {item["token_type"]}')
+                    if 'token_type' in item:
+                        print(f'    Token type: {item["token_type"]}')
                     print(f'    Scope: {item["scope"]}')
                     print(f'    Issued at: {item["issued_at"]}')
                     print(f'    Expires at: {item["expires_at"]}')
