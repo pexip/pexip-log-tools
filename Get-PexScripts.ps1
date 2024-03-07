@@ -31,7 +31,8 @@ $FilesToManage = @{
     "$downloadFolder\Pexip_Log_Tools.ps1" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/Pexip_Log_Tools.ps1"
     "$downloadFolder\pexwebapps.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexwebapps.py"
     "$downloadFolder\vmotion.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/vmotion.py"
-
+    "$downloadFolder\pexauthconfig.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexauthconfig.py"
+    "$downloadFolder\pexidpconfig.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexidpconfig.py"
 }
 
 # Check to see if the backup folder exits
