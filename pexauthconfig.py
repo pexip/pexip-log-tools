@@ -246,9 +246,12 @@ class PexAuth:
                     print(f'#{idx} LDAP group DN: {item["ldap_group_dn"]}, Name: {item["name"]}')
                 if role_mapping_permissions.keys():
                     permissions = ''
-                    for permission in role_mapping_permissions[item['id']]:
-                        permissions += f'{permission}, '
-                    print(f'    Administrator roles: {permissions[:-1].removesuffix(",")}')
+                    try:
+                        for permission in role_mapping_permissions[item['id']]:
+                            permissions += f'{permission}, '
+                    except:
+                        pass
+                    print(f'    Administrator roles: {permissions[:-1].removesuffix(",")}') if permissions else print('    Administrator roles: None')
                     print()
         if self.version['version-id'] == '34':
             if self.permissions_oauth2client_table:
@@ -259,7 +262,10 @@ class PexAuth:
                     print(f'OAuth2 client #{idx}: {item["client_name"]}')
                     print(f'    Client ID: {item["client_id"]}')
                     print(f'    Administrator role: {self.permissions_oauth2token_table[item["id"]][0]}')
-                    print(f'    LDAP group dn: {self.authentication_role_mapping_table[[item["role_id"]][0]]["ldap_group_dn"]}')
+                    try:
+                        print(f'    LDAP group dn: {self.authentication_role_mapping_table[[item["role_id"]][0]]["ldap_group_dn"]}')
+                    except:
+                        pass
                     print()
         if self.version['version-id'] >= '35':
             if self.permissions_oauth2client_table:
@@ -293,9 +299,12 @@ class PexAuth:
             permissions = ''
             print(f'Administrator role #{idx}: {item["name"]}')
             if self.authentication_group_permission_table.keys():
-                for permission in self.authentication_group_permission_table[item['id']]:
-                    permissions += f'{permission}, '
-            print(f'    Permissions ({len(permissions[:-1].removesuffix(",").split(","))}): {permissions[:-1].removesuffix(",")}')
+                try:
+                    for permission in self.authentication_group_permission_table[item['id']]:
+                        permissions += f'{permission}, '
+                except:
+                    pass
+            print(f'    Permissions ({len(permissions[:-1].removesuffix(",").split(","))}): {permissions[:-1].removesuffix(",")}') if permissions else print(f'    Permissions: None')
             print()
         if issues:
             print('Potential Issues')
