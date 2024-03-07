@@ -44,7 +44,6 @@ else {
 
 $PathToNotepad = "Notepad++\notepad++.exe"
 $PathToGrepWin = "grepWin\grepWin.exe"
-$PathToFile = "C:\Tools\file-5.03-bin\bin\file.exe"
 $DBSummaryScript = "C:\Tools\Scripts\dbsummary.py"
 $LogreaderScript = "C:\Tools\Scripts\logreader.py"
 $vMotionScript = "C:\Tools\Scripts\detect_vMotion.py"
@@ -759,49 +758,46 @@ function Unprotect-PexFile {
     process {
         $FileItem = Get-Item $FileNameToProcess
 
-        if ($pscmdlet.ShouldProcess($FileItem))
-        {
+        if ($pscmdlet.ShouldProcess($FileItem)){
+            # Check if the first 6 bits of the file contain word "salted" which indicates aes encryption and if it does proceed to decrypt
+            if (([System.Text.Encoding]::ASCII.GetString((Get-Content -Encoding Byte -TotalCount 6 -Path $FileItem))) -like "*salted*"){
+                Move-Item -Path $FileItem -Destination "$($FileItem.FullName).bak"
+                Write-Host "The file appears to be encrypted. Please Enter the key to decrypt the file :" $FileItem.Name
+                Write-Host
+                $Result = ($host.ui.ReadLine()).TrimEnd()
+					
+				try {
+					# Attempt to decrypt the file and monitor messages outputed to the console 
+					$output = & openssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak" 2>&1
 
-            if (-Not (Test-Path -Path $PathToFile -PathType Leaf)) {
-                Write-Warning -Message "Cannot detect if the file is encrypted as 'File' is missing in $PathToFile"
-                Write-Warning -Message "The may cause issues if attempting to unzip an encrypted file."
-                Write-Warning -Message "Will continue and assume that the file is OK."
-                #Pause
-                #Exit 1
-            }
-            else {
-                # Use the GNU tool 'file.exe' to determine if the file is readable as a non 'data' file.
-                # If not, it's probably encrypted.
-                if (& $PathToFile $FileItem | Select-String -pattern "; data" -quiet)
-                {
-                    Move-Item -Path $FileItem -Destination "$($FileItem.FullName).bak"
-                    Write-Host "Please Enter the key to decrypt the file :" $FileItem.Name
-                    Write-Host
-                    $Result = ($host.ui.ReadLine()).TrimEnd()
-
-                    & openssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak"
-
-                    # Use the GNU tool 'file.exe' to determine if the file is readable as a non 'data' file.
-                    # If not, then decryption probably failed so restore the file.
-                    # PCAPNG and PCAP files (Wireshark), will still read as data files, so ignore checking those.
-                    if (((& $PathToFile $FileItem | Select-String -pattern "; data" -quiet) -eq $true) -and ($FileItem.Extension -notin ".pcap", ".pcapng", ".webm", ".mp4", ".avi"))
-                    {
-                        Write-Warning "The file did not decrypt properly, the key may be wrong."
-                        Write-Warning "Restoring original file and exiting."
-                        Remove-Item $FileItem
-                        Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
-                        pause
-                        Exit 0
-                    }
-                    else
-                    {
-                        Write-Host "Decryption Complete."
-                        Remove-Item "$($FileItem.FullName).bak"
-                    }
+					# Check if the output contains "bad decrypt"
+					if ($output -match "bad decrypt") {
+						Write-Host	
+						Write-Warning "The file did not decrypt properly, the key may be wrong."
+						Write-Warning "Restoring original file and exiting."
+						Write-Host
+						Remove-Item $FileItem
+                       				Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
+                       				pause
+                        			Exit 0
+						}
+					else {
+						Write-Host
+                        			Write-Host "Decryption Complete."
+                        			Remove-Item "$($FileItem.FullName).bak"
+						}
+					}	 
+				catch {
+					Write-Warning "The file did not decrypt properly, the key may be wrong."
+                        		Write-Warning "Restoring original file and exiting."
+                        		Remove-Item $FileItem
+                        		Move-Item -Path "$($FileItem.FullName).bak" -Destination $FileItem
+                        		pause
+                        		Exit 0
+					}
                 }
             }
         }
-    }
 }
 
 # Script starts here
