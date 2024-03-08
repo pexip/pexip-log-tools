@@ -285,9 +285,15 @@ class PexAuth:
                 print()
                 for idx, item in enumerate(self.permissions_oauth2tokens_table.values(), start=1):
                     print(f'OAuth2 token #{idx}: {self.permissions_oauth2client_table[item["client_id"]]["client_name"]} (ID: {self.permissions_oauth2client_table[item["client_id"]]["client_id"]})')
+<<<<<<< HEAD
                     if 'token_type' in item:
                         print(f'    Token type: {item["token_type"]}')
                     print(f'    Scope: {item["scope"]}')
+=======
+                    if item['token_type']:
+                        print(f'    Token type: {item["token_type"]}')
+                    print(f'    Scope: {item["scope"]}') if item['scope'] else print('    Scope: None')
+>>>>>>> 8efe20f (fixup token_type output)
                     print(f'    Issued at: {item["issued_at"]}')
                     print(f'    Expires at: {item["expires_at"]}')
                     print(f'    Access token: {item["access_token"]}')
