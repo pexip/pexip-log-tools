@@ -44,6 +44,8 @@ else {
 
 $PathToNotepad = "Notepad++\notepad++.exe"
 $PathToGrepWin = "grepWin\grepWin.exe"
+$PathToOpenssl = ""
+
 $DBSummaryScript = "C:\Tools\Scripts\dbsummary.py"
 $LogreaderScript = "C:\Tools\Scripts\logreader.py"
 $vMotionScript = "C:\Tools\Scripts\detect_vMotion.py"
@@ -771,13 +773,31 @@ function Unprotect-PexFile {
         if ($pscmdlet.ShouldProcess($FileItem)){
             # Check if the first 6 bits of the file contain word "salted" which indicates aes encryption and if it does proceed to decrypt
             if (([System.Text.Encoding]::ASCII.GetString((Get-Content -Encoding Byte -TotalCount 6 -Path $FileItem))) -like "*salted*"){
-                Move-Item -Path $FileItem -Destination "$($FileItem.FullName).bak"
-                Write-Host "The file appears to be encrypted. Please Enter the key to decrypt the file :" $FileItem.Name
-                Write-Host
-                $Result = ($host.ui.ReadLine()).TrimEnd()	
+		# Check if OpenSSL is installed in Program Files
+		if (Test-Path 'C:\Program Files\OpenSSL-Win64\bin\openssl.exe') {
+		    $PathToOpenssl = 'C:\Program Files\OpenSSL-Win64\bin\openssl.exe'
+		}
+		# Check if OpenSSL is installed in the root 
+		elseif (Test-Path 'C:\OpenSSL-Win64\bin\openssl.exe') {
+		    $PathToOpenssl = 'C:\OpenSSL-Win64\bin\openssl.exe'
+		}
+		# OpenSSL not found
+		else {
+		    Write-Warning 'The file appears to be encrypted but OpenSSL cannot be found on this computer. As a result it is not possible to decrypt the file.'
+		    Write-Host
+		    Write-Warning 'Please search for "Win32/Win64 OpenSSL Installer for Windows", install Win64 OpenSSL v3.x in \Program Files\ and try again.'				
+		    Write-Host
+		    Write-Host "Please press Enter to close the window."
+		    Read-Host
+		    exit 1  # Exit with an error code to indicate a problem
+		}
+            Move-Item -Path $FileItem -Destination "$($FileItem.FullName).bak"
+            Write-Host "The file appears to be encrypted. Please Enter the key to decrypt the file :" $FileItem.Name
+            Write-Host
+            $Result = ($host.ui.ReadLine()).TrimEnd()	
 		try {
 			# Attempt to decrypt the file and monitor messages outputed to the console 
-			$output = & openssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak" 2>&1
+			$output = & $PathToOpenssl aes-256-cbc -d -salt -pbkdf2 -out "$($FileItem.FullName)" -pass "pass`:$Result" -md "sha256" -in "$($FileItem.FullName).bak" 2>&1
 
 			# Check if the output contains "bad decrypt"
 			if ($output -match "bad decrypt") {
