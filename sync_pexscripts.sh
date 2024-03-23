@@ -29,15 +29,15 @@ declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py"
 
 # Create local directory
 if [[ ! -e ~/pexscripts ]]; then
-    mkdir ~/pexscripts
+    sudo mkdir ~/pexscripts
 fi
 
 # Backup previous versions of scripts in the array
 for i in "${arr[@]}"
 do
     if [ -f ~/pexscripts/$i ]; then
-        cp ~/pexscripts/$i ~/pexscripts/$i.old
-        sudo chown $USER ~/pexscripts/$i.old
+        sudo chown -HR $USER ~/pexscripts/$i.old
+        sudo cp ~/pexscripts/$i ~/pexscripts/$i.old
     fi
 done
 
@@ -60,7 +60,7 @@ if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
     code_installed=0
 
     if [ -f ~/pexscripts/.sync_pexscripts ]; then
-        rm -f ~/pexscripts/.sync_pexscripts
+        sudo rm -f ~/pexscripts/.sync_pexscripts
     fi
     # Create run folder, symbolic links and make them executable
     echo 'Creating links & making scripts executable...'
@@ -71,15 +71,17 @@ if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
     do
         # If file exsits don't remove previous py2 symlinks
         if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
-            rm -f /usr/local/bin/$i
+            sudo rm -f /usr/local/bin/$i
         fi
+        # remove .py extension from the symlink
         sudo ln -sf ~/pexscripts/$i /usr/local/bin/${i%.py}
-        sudo chmod +x ~/pexscripts/$i && sudo chown -R $USER /usr/local/bin/${i%.py}
+        sudo chmod +x ~/pexscripts/$i && sudo chown -HR $USER /usr/local/bin/${i%.py}
     done
 
     # Add script update to cron
     echo 'Adding run job to cron...'
-    crontab -l | grep -v 'sync_pexscripts.sh' > ~/pexscripts/.cron
+    crontab -l | grep -v 'pexscripts' > ~/pexscripts/.cron
+    echo "# Download pexscripts (10:00 Mon-Fri)" >> ~/pexscripts/.cron
     echo "5 10 * * * ~/pexscripts/sync_pexscripts.sh >/dev/null 2>&1" >> ~/pexscripts/.cron
     crontab ~/pexscripts/.cron
     rm -f ~/pexscripts/.cron && touch ~/pexscripts/.sync_pexscripts_v3
@@ -87,26 +89,28 @@ if [ ! -f ~/pexscripts/.sync_pexscripts_v3 ]; then
     # Check for Homebrew & install if we don't have it
     if [[ $(which -s brew) == "brew not found" ]] ; then
         echo "Installing homebrew..."
-        rm -rf /Library/Developer/CommandLineTools
+        sudo rm -rf /Library/Developer/CommandLineTools
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
 
     # Ask the user if they would like to install VSCode
-    echo "Do you wish to install VSCode via brew?"
-    select yn in "Yes" "No"; do
-        case $yn in
-            Yes ) 
-                echo 'Installing VSCode...'
-                /opt/homebrew/bin/brew update && /opt/homebrew/bin/brew upgrade
-                /opt/homebrew/bin/brew install --appdir="/Applications" --cask visual-studio-code
-                curl --silent -L -o ~/pexscripts/vsc-pexiplogs-extension-latest.vsix https://github.com/darrengoulden/vsc-pexiplogs-extension/releases/download/latest/vsc-pexiplogs-extension-latest.vsix
-                /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ~/pexscripts/vsc-pexiplogs-extension-latest.vsix
-                code_installed=1;
-                break;;
-            No )
-                break;;
-        esac
-    done
+    if [[ $(which brew) == "/opt/homebrew/bin/brew" ]] ; then
+        echo "Install VSCode via brew?"
+        select yn in "Yes" "No"; do
+            case $yn in
+                Yes ) 
+                    echo 'Installing VSCode...'
+                    /opt/homebrew/bin/brew update && /opt/homebrew/bin/brew upgrade
+                    /opt/homebrew/bin/brew install --appdir="/Applications" --cask visual-studio-code
+                    curl --silent -L -o ~/pexscripts/vsc-pexiplogs-extension-latest.vsix https://github.com/darrengoulden/vsc-pexiplogs-extension/releases/download/latest/vsc-pexiplogs-extension-latest.vsix
+                    /Applications/Visual\ Studio\ Code.app/Contents/Resources/app/bin/code --install-extension ~/pexscripts/vsc-pexiplogs-extension-latest.vsix
+                    code_installed=1;
+                    break;;
+                No )
+                    break;;
+            esac
+        done
+    fi
 
     # Check for pip3 & install if we don't have it so we can install lxml (required for logreader)
     if [[ $(which -s pip3) == "pip3 not found" ]] ; then
@@ -122,15 +126,15 @@ fi
 
 # Set permissions
 if [[ ! $EUID -ne 0 ]]; then
-    chown -R $SUDO_USER ~/pexscripts && chmod 700 ~/pexscripts
+    chown -HR $SUDO_USER ~/pexscripts && chmod 700 ~/pexscripts
 else
-    chown -R $USER ~/pexscripts && chmod 700 ~/pexscripts
+    chown -HR $USER ~/pexscripts && chmod 700 ~/pexscripts
 fi
 # chmod
 for i in "${arr[@]}"
 do
     sudo ln -sf ~/pexscripts/$i /usr/local/bin/${i%.py}
-    sudo chmod +x ~/pexscripts/$i && sudo chown -R $USER /usr/local/bin/${i%.py}
+    sudo chmod +x ~/pexscripts/$i && sudo chown -RH $USER /usr/local/bin/${i%.py}
 done
 echo 'Done'
 
