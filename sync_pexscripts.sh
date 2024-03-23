@@ -29,14 +29,14 @@ declare -a arr=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py"
 
 # Create local directory
 if [[ ! -e ~/pexscripts ]]; then
-    sudo mkdir ~/pexscripts
+    mkdir ~/pexscripts
 fi
 
 # Backup previous versions of scripts in the array
 for i in "${arr[@]}"
 do
     if [ -f ~/pexscripts/$i ]; then
-        sudo chown -HR $USER ~/pexscripts/$i.old
+        chown -HR $USER ~/pexscripts/$i.old
         sudo cp ~/pexscripts/$i ~/pexscripts/$i.old
     fi
 done
