@@ -55,12 +55,10 @@ def replace(value): # v0.4 - fixup to make it easier to add items_to_replace
     return value
 
 def get_worker(workers, current):
-    for key, item in workers.items():
+    for key in workers.keys():
         if current == key:
-            node = '%s (%s)' % (item['name'], key)
+            node = '%s (%s)' % (workers[key]['name'], key)
             return node
-        else:
-            return ''
 
 def builddict(db, table, fields, key):
     resp = {}
