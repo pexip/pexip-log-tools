@@ -378,7 +378,7 @@ def main(rootdir):
             epstatus_data = [epstatus_header]
             for key, endpoint in sorted(conferencingstatus_mjxendpoint.items()):
                 worker = get_worker(platform_workervm_by_ip, endpoint['last_worker'])
-                endpoints = endpoint['endpoint_name'], endpoint['endpoint_type'], endpoint['endpoint_address'], endpoint['room_email'][:35] + '..' if len(endpoint['room_email']) > 37 else endpoint['room_email'], endpoint['mjx_integration_name'], endpoint['number_of_meetings'], worker, endpoint['last_contact_time']
+                endpoints = endpoint['endpoint_name'], endpoint['endpoint_type'], endpoint['endpoint_address'], endpoint['room_email'][:35] + '..' if len(endpoint['room_email']) > 37 else endpoint['room_email'], endpoint['mjx_integration_name'], endpoint['number_of_meetings'], worker if worker else None, endpoint['last_contact_time']
                 epstatus_data.append(endpoints)
             if endpoints:
                 tabulate(epstatus_data)
