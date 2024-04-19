@@ -1,4 +1,4 @@
-# Copyright 2023 Pexip AS
+# Copyright 2024 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#$invocation = (Get-Variable MyInvocation -Scope 0).Value
-#$scriptPath = Split-Path $Invocation.MyCommand.Path
+
 $downloadFolder = "C:\Tools\Scripts"
 $backupFolder = "$downloadFolder\Backup"
 
@@ -44,32 +43,64 @@ if (-Not (Test-Path -Path $backupFolder -PathType Container))
 # Create a time stamp used to append to the backup file.
 $timestamp = Get-Date -Format s | ForEach-Object { $_ -replace ":", "." }
 
-# Setup Web client
-#$wc = new-object System.Net.WebClient
-
 # Check if new configuration file exists
-
-        if (-not (Test-Path "c:\Tools\Scripts\Variables.ps1")) {
-		Write-Warning "Due to a new configuration approach please provide answers the following values ( or just hit Enter for defaults )"
-		$snapDir = Read-Host "Please enter the directory path for snaps (default: c:\Snaps)"
-		if ([string]::IsNullOrEmpty($snapDir)) {
-			$SnapDir = "C:\Snaps"
-		}
-		$askForTicketNumber = Read-Host "Do you want to be prompted for ticket number to be associated with a snapshot ? (y/n) (default: n)"
-		if ($askForTicketNumber -eq "y") {
-			$askForTicketNumber = $true
-		} else {
-			$askForTicketNumber = $false
-		}
-		$numberOfSnaps = Read-Host "Please enter the number of support log files to be processed by default by the logreader (default: 20)"
-		if ([string]::IsNullOrEmpty($numberOfSnaps)) {
-			$numberOfSnaps = 20
-		}
-		# Write values to config file
-		Write-Host '$SnapDir ='`"$SnapDir`" *> c:\Tools\Scripts\Variables.ps1
-		Write-Host '$askForTicketNumber ='`$$askForTicketNumber *>> c:\Tools\Scripts\Variables.ps1
-		Write-Host '$numberOfSnaps ='`"$numberOfSnaps`" *>> c:\Tools\Scripts\Variables.ps1
-		}		
+if (-not (Test-Path "c:\Tools\Scripts\Variables.ps1")) {
+    Write-Warning "Due to a new configuration approach please provide answers the following values ( or just hit Enter for defaults )"
+    $snapDir = Read-Host "Please enter the directory path for snaps (default: c:\Snaps)"
+    if ([string]::IsNullOrEmpty($snapDir)) {
+        $SnapDir = "C:\Snaps"
+    }
+    $askForTicketNumber = Read-Host "Do you want to be prompted for ticket number to be associated with a snapshot ? (y/n) (default: n)"
+    if ($askForTicketNumber -eq "y") {
+        $askForTicketNumber = $true
+    } else {
+        $askForTicketNumber = $false
+    }
+    $numberOfSnaps = Read-Host "Please enter the number of support log files to be processed by default by the logreader (default: 20)"
+    if ([string]::IsNullOrEmpty($numberOfSnaps)) {
+        $numberOfSnaps = 20
+    }
+    $OpenInNotepadPlusPlus = Read-Host "Do you want Log Tools to automatically open script outputs in Notepad++ ? (y/n) (default: y)"
+    if ($OpenInNotepadPlusPlus -eq "n") {
+        $OpenInNotepadPlusPlus = $false
+        $OpenInSublime = Read-Host "Would you like to open script outputs in Sublime v1 instead? (y/n) (default: n)"
+        if ($OpenInSublime -eq "y") {
+            $OpenInSublime = $true
+        } else {
+            $OpenInSublime = $false
+        }
+    } else {
+        $OpenInNotepadPlusPlus = $true
+        $OpenInSublime = $false
+    }
+    # Write values to config file
+    Write-Host '$SnapDir ='`"$SnapDir`" *> c:\Tools\Scripts\Variables.ps1
+    Write-Host '$askForTicketNumber ='`$$askForTicketNumber *>> c:\Tools\Scripts\Variables.ps1
+    Write-Host '$numberOfSnaps ='`"$numberOfSnaps`" *>> c:\Tools\Scripts\Variables.ps1
+    Write-Host '$OpenInNotepadPlusPlus ='`$$OpenInNotepadPlusPlus *>> c:\Tools\Scripts\Variables.ps1
+    Write-Host '$OpenInSublime ='`$$OpenInSublime *>> c:\Tools\Scripts\Variables.ps1
+} else {
+    # If Variables.ps1 exists, check for the existence of $OpenInNotepadPlusPlus variable
+    . "c:\Tools\Scripts\Variables.ps1"
+    if (-not (Get-Variable -Name OpenInNotepadPlusPlus -ErrorAction SilentlyContinue)) {
+        $OpenInNotepadPlusPlus = Read-Host "Do you want Log Tools to keep automatically opening script outputs in Notepad++ ? (y/n) (default: y)"
+        if ($OpenInNotepadPlusPlus -eq "n") {
+            $OpenInNotepadPlusPlus = $false
+            $OpenInSublime = Read-Host "Would you like to open script outputs in Sublime v1 instead? (y/n) (default: n)"
+            if ($OpenInSublime -eq "y") {
+                $OpenInSublime = $true
+            } else {
+                $OpenInSublime = $false
+            }
+        } else {
+            $OpenInNotepadPlusPlus = $true
+            $OpenInSublime = $false
+        }
+        # Append the new variable to the config file
+        Write-Host '$OpenInNotepadPlusPlus ='`$$OpenInNotepadPlusPlus *>> c:\Tools\Scripts\Variables.ps1
+        Write-Host '$OpenInSublime ='`$$OpenInSublime *>> c:\Tools\Scripts\Variables.ps1
+    }
+}
 
 # Loop through each item in the has table to see if
 $FilesToManage.Keys | ForEach-Object {
