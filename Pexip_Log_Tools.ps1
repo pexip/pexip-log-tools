@@ -34,17 +34,22 @@ if (Test-Path 'C:\Program Files\Python39\python.exe') {
 elseif (Test-Path 'C:\Program Files\Python310\python.exe') {
     $PathToPython = 'C:\Program Files\Python310\python.exe'
 }
+# Check if Python 3.12.x is installed
+elseif (Test-Path 'C:\Program Files\Python312\python.exe') {
+    $PathToPython = 'C:\Program Files\Python312\python.exe'
+}
 # Python version not found
 else {
-    Write-Error 'Python 3.9.x or 3.10.x is not installed on this computer. Pexip Log Tools will not work.'
-	Write-Host "Please press Enter to close the window."
-	Read-Host
-	exit 1  # Exit with an error code to indicate a problem
+    Write-Error 'Python 3.9.x, 3.10.x or 3.12.x is not installed on this computer. Pexip Log Tools will not work.'
+    Write-Host "Please press Enter to close the window."
+    Read-Host
+    exit 1  # Exit with an error code to indicate a problem
 }
 
 $PathToNotepad = "Notepad++\notepad++.exe"
 $PathToGrepWin = "grepWin\grepWin.exe"
 $PathToOpenssl = ""
+$PathToSublime = "Sublime Text\sublime_text.exe"
 
 $DBSummaryScript = "C:\Tools\Scripts\dbsummary.py"
 $LogreaderScript = "C:\Tools\Scripts\logreader.py"
@@ -93,6 +98,7 @@ $AnythingElseArray = @()
 $EnvironmentHash = @{
     "grepWin 1.6.16" = $PathToGrepWin;
     "Notepad++" = $PathToNotepad;
+    "Sublime Text 3" = $PathToSublime;
 }
 
 Set-StrictMode -Version latest
@@ -100,6 +106,7 @@ Set-StrictMode -Version latest
 function Test-PexEnvironment {
     $global:PathToNotepad = $null
     $global:PathToGrepWin = $null
+    $global:PathToSublime = $null
 
     foreach ($appName in $EnvironmentHash.Keys) {
         $path = $EnvironmentHash[$appName]
@@ -112,38 +119,44 @@ function Test-PexEnvironment {
                 $fullPath = Join-Path $appData\Programs $path
 
                 if (-not (Test-Path $fullPath)) {
-                    Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please re-install the missing file in either of these locations and try again. If grepwin was recently installed, restart your PC."
-		    Read-Host
-		    exit 1  # Exit with an error code to indicate a problem
-      
+                    # Check if the missing application is required
+                    if (($appName -eq "Notepad++" -and $OpenInNotepadPlusPlus) -or ($appName -eq "Sublime Text 3" -and $OpenInSublime) -or ($appName -eq "grepWin 1.6.16")) {
+                        Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please re-install the missing file in either of these locations and try again. If the application was recently installed, restart your PC."
+                        Read-Host
+                        exit 1  # Exit with an error code to indicate a problem
+                    }
                 } else {
                     # Update global variables with the full path
-                    if ($appName -eq "Notepad++") {
-                        $global:PathToNotepad = $fullPath
-                    } elseif ($appName -eq "grepWin 1.6.16") {
-                        $global:PathToGrepWin = $fullPath
-                    }
+                    UpdateGlobalPathVariables $appName $fullPath
                 }
             } else {
                 # Update global variables with the full path
-                if ($appName -eq "Notepad++") {
-                    $global:PathToNotepad = $fullPath
-                } elseif ($appName -eq "grepWin 1.6.16") {
-                    $global:PathToGrepWin = $fullPath
-                }
+                UpdateGlobalPathVariables $appName $fullPath
             }
         } else {
             # Update global variables with the full path
-            if ($appName -eq "Notepad++") {
-                $global:PathToNotepad = $fullPath
-            } elseif ($appName -eq "grepWin 1.6.16") {
-                $global:PathToGrepWin = $fullPath
-            }
+            UpdateGlobalPathVariables $appName $fullPath
         }
     }
 
     return $true
 }
+
+function UpdateGlobalPathVariables {
+    param (
+        [string]$appName,
+        [string]$fullPath
+    )
+
+    if ($appName -eq "Notepad++") {
+        $global:PathToNotepad = $fullPath
+    } elseif ($appName -eq "grepWin 1.6.16") {
+        $global:PathToGrepWin = $fullPath
+    } elseif ($appName -eq "Sublime Text 3") {
+        $global:PathToSublime = $fullPath
+    }
+}
+
 
 function Test-PexLogs {
     <#
@@ -917,8 +930,8 @@ else {
                 $ConfHistoryFile = $false
             }
 
-            # If there are valid files then open them open them (although might nee to wait for the log reader process to finish).
-            if (($DBSummaryFile -ne $false) -and ($LogReaderReturn -ne $false) -and ($ConfHistoryFile -ne $false)) {
+            # If there are valid files and OpenInNotepadPlusPlus is true then open them open them (although might nee to wait for the log reader process to finish).
+            if (($DBSummaryFile -ne $false) -and ($LogReaderReturn -ne $false) -and ($ConfHistoryFile -ne $false) -and ($OpenInNotepadPlusPlus -ne $false)) {
                 Wait-Process $LogReaderReturn[1].Id -ErrorAction SilentlyContinue
                 if ($null -eq (Get-Content -Path $LogReaderReturn[0])) {
                     Write-Output "Nothing to show. Perhaps check the error log file in the same folder." | Add-Content -Path $LogReaderReturn[0]
@@ -926,19 +939,37 @@ else {
 
                 Start-Process $PathToNotepad -ArgumentList ("`"$DBSummaryFile`"", "`"$ConfHistoryFile`"", "`"$($LogReaderReturn[0])`"")
             }
-            elseif (($DBSummaryFile -ne $false) -and ($ConfHistoryFile -ne $false)) {
+            elseif (($DBSummaryFile -ne $false) -and ($ConfHistoryFile -ne $false) -and ($OpenInNotepadPlusPlus -ne $false)) {
                 Start-Process $PathToNotepad -ArgumentList ("`"$DBSummaryFile`"", "`"$ConfHistoryFile`"")
             }
-            elseif ($LogReaderReturn -ne $false) {
+            elseif (($LogReaderReturn -ne $false) -and ($OpenInNotepadPlusPlus -ne $false)) {
                 Wait-Process $LogReaderReturn[1].Id -ErrorAction SilentlyContinue
                 if ($null -eq (Get-Content -Path $LogReaderReturn[0])) {
                     Write-Output "Nothing to show. Perhaps check the error log file in the same folder." | Add-Content -Path $LogReaderReturn[0]
                 }
                 Start-Process $PathToNotepad -ArgumentList ("`"$($LogReaderReturn[0])`"")
             }
+            elseif (($DBSummaryFile -ne $false) -and ($LogReaderReturn -ne $false) -and ($ConfHistoryFile -ne $false) -and ($OpenInSublime -ne $false)) {
+                Wait-Process $LogReaderReturn[1].Id -ErrorAction SilentlyContinue
+                if ($null -eq (Get-Content -Path $LogReaderReturn[0])) {
+                    Write-Output "Nothing to show. Perhaps check the error log file in the same folder." | Add-Content -Path $LogReaderReturn[0]
+                }
+
+                Start-Process $PathToSublime -ArgumentList ("`"$DBSummaryFile`"", "`"$ConfHistoryFile`"", "`"$($LogReaderReturn[0])`"")
+            }
+            elseif (($DBSummaryFile -ne $false) -and ($ConfHistoryFile -ne $false) -and ($OpenInSublime -ne $false)) {
+                Start-Process $PathToSublime -ArgumentList ("`"$DBSummaryFile`"", "`"$ConfHistoryFile`"")
+            }
+            elseif (($LogReaderReturn -ne $false) -and ($OpenInSublime -ne $false)) {
+                Wait-Process $LogReaderReturn[1].Id -ErrorAction SilentlyContinue
+                if ($null -eq (Get-Content -Path $LogReaderReturn[0])) {
+                    Write-Output "Nothing to show. Perhaps check the error log file in the same folder." | Add-Content -Path $LogReaderReturn[0]
+                }
+                Start-Process $PathToSublime -ArgumentList ("`"$($LogReaderReturn[0])`"")
+            }
 
             # Open up Explorer in the parsed folder
-            Invoke-Item "$SnapDir\$BaseName\$LogDir\$ParsedLogDir"
+            Invoke-Item "$($ConvertPexlogReturn[0])\$ParsedLogDir"
         }
     }
 
@@ -955,7 +986,12 @@ else {
             if ($null -eq (Get-Content -Path $LogReaderReturn[0])) {
                 Write-Output "Nothing to show. Perhaps check the error log file in the same folder." | Add-Content -Path $LogReaderReturn[0]
             }
-            Start-Process $PathToNotepad -ArgumentList ("`"$($LogReaderReturn[0])`"")
+            if ($OpenInNotepadPlusPlus -eq $true) {
+                Start-Process $PathToNotepad -ArgumentList ("`"$($LogReaderReturn[0])`"")
+            }
+            elseif ($OpenInNotepadPlusPlus -eq $false -and $OpenInSublime -eq $true) {
+                Start-Process $PathToSublime -ArgumentList ("`"$($LogReaderReturn[0])`"")
+            }
         }
         # Open up Explorer in the parsed folder
         Invoke-Item "$($ConvertPexlogReturn[0])\$ParsedLogDir"
@@ -993,69 +1029,3 @@ else {
     }
 }
 Pause
-# SIG # Begin signature block
-# MIIL4QYJKoZIhvcNAQcCoIIL0jCCC84CAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
-# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUk5uGAJZbvquPcAtI/sYZkMfH
-# 0rqggglKMIIEmTCCA4GgAwIBAgIQcaC3NpXdsa/COyuaGO5UyzANBgkqhkiG9w0B
-# AQsFADCBqTELMAkGA1UEBhMCVVMxFTATBgNVBAoTDHRoYXd0ZSwgSW5jLjEoMCYG
-# A1UECxMfQ2VydGlmaWNhdGlvbiBTZXJ2aWNlcyBEaXZpc2lvbjE4MDYGA1UECxMv
-# KGMpIDIwMDYgdGhhd3RlLCBJbmMuIC0gRm9yIGF1dGhvcml6ZWQgdXNlIG9ubHkx
-# HzAdBgNVBAMTFnRoYXd0ZSBQcmltYXJ5IFJvb3QgQ0EwHhcNMTMxMjEwMDAwMDAw
-# WhcNMjMxMjA5MjM1OTU5WjBMMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMdGhhd3Rl
-# LCBJbmMuMSYwJAYDVQQDEx10aGF3dGUgU0hBMjU2IENvZGUgU2lnbmluZyBDQTCC
-# ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJtVAkwXBenQZsP8KK3TwP7v
-# 4Ol+1B72qhuRRv31Fu2YB1P6uocbfZ4fASerudJnyrcQJVP0476bkLjtI1xC72Ql
-# WOWIIhq+9ceu9b6KsRERkxoiqXRpwXS2aIengzD5ZPGx4zg+9NbB/BL+c1cXNVeK
-# 3VCNA/hmzcp2gxPI1w5xHeRjyboX+NG55IjSLCjIISANQbcL4i/CgOaIe1Nsw0Rj
-# gX9oR4wrKs9b9IxJYbpphf1rAHgFJmkTMIA4TvFaVcnFUNaqOIlHQ1z+TXOlScWT
-# af53lpqv84wOV7oz2Q7GQtMDd8S7Oa2R+fP3llw6ZKbtJ1fB6EDzU/K+KTT+X/kC
-# AwEAAaOCARcwggETMC8GCCsGAQUFBwEBBCMwITAfBggrBgEFBQcwAYYTaHR0cDov
-# L3QyLnN5bWNiLmNvbTASBgNVHRMBAf8ECDAGAQH/AgEAMDIGA1UdHwQrMCkwJ6Al
-# oCOGIWh0dHA6Ly90MS5zeW1jYi5jb20vVGhhd3RlUENBLmNybDAdBgNVHSUEFjAU
-# BggrBgEFBQcDAgYIKwYBBQUHAwMwDgYDVR0PAQH/BAQDAgEGMCkGA1UdEQQiMCCk
-# HjAcMRowGAYDVQQDExFTeW1hbnRlY1BLSS0xLTU2ODAdBgNVHQ4EFgQUV4abVLi+
-# pimK5PbC4hMYiYXN3LcwHwYDVR0jBBgwFoAUe1tFz6/Oy3r9MZIaarbzRutXSFAw
-# DQYJKoZIhvcNAQELBQADggEBACQ79degNhPHQ/7wCYdo0ZgxbhLkPx4flntrTB6H
-# novFbKOxDHtQktWBnLGPLCm37vmRBbmOQfEs9tBZLZjgueqAAUdAlbg9nQO9ebs1
-# tq2cTCf2Z0UQycW8h05Ve9KHu93cMO/G1GzMmTVtHOBg081ojylZS4mWCEbJjvx1
-# T8XcCcxOJ4tEzQe8rATgtTOlh5/03XMMkeoSgW/jdfAetZNsRBfVPpfJvQcsVncf
-# hd1G6L/eLIGUo/flt6fBN591ylV3TV42KcqF2EVBcld1wHlb+jQQBm1kIEK3Osgf
-# HUZkAl/GR77wxDooVNr2Hk+aohlDpG9J+PxeQiAohItHIG4wggSpMIIDkaADAgEC
-# AhBbwQIMscOmSL02LV/biYW7MA0GCSqGSIb3DQEBCwUAMEwxCzAJBgNVBAYTAlVT
-# MRUwEwYDVQQKEwx0aGF3dGUsIEluYy4xJjAkBgNVBAMTHXRoYXd0ZSBTSEEyNTYg
-# Q29kZSBTaWduaW5nIENBMB4XDTE5MTAyMzAwMDAwMFoXDTIxMTAyMjIzNTk1OVow
-# ZzELMAkGA1UEBhMCTk8xDTALBgNVBAgMBE9zbG8xDTALBgNVBAcMBE9zbG8xETAP
-# BgNVBAoMCFBleGlwIEFTMRQwEgYDVQQLDAtFbmdpbmVlcmluZzERMA8GA1UEAwwI
-# UGV4aXAgQVMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDLkrt6tIU7
-# cQ4SCKvFLYta9A9A8QMmqaKA2/E4Isr447q/l9oweY2TBIGDCxnhTnkOtnL9fCZx
-# AbOjneoDEFNF4R/SkJtdYwDWUTffuYmZ/DOuUleHOKsIly8TmAQFmJWKI0RIL4fT
-# 2pPliW/Nxmzx5638c6X2vIsW1j3L5Lk34lWJ6nf+o+S2q7vhTHks1pL2/FFRhYWW
-# 60Teb5e2XaVHunSk5zuggyOCxKyRAAwkf1FAl/+1AdLlLtcsCEUdt36NBvW0djRm
-# J3N8GazilgswIosUWZYab3VfwWG3p+sVVwemluLbDq535D19Nv96gHi52LrhVRAp
-# qIHoGYq5Jx5pAgMBAAGjggFqMIIBZjAJBgNVHRMEAjAAMB8GA1UdIwQYMBaAFFeG
-# m1S4vqYpiuT2wuITGImFzdy3MB0GA1UdDgQWBBQgSp8I3Pn8a0G+1IHvOpvxYrtL
-# gzArBgNVHR8EJDAiMCCgHqAchhpodHRwOi8vdGwuc3ltY2IuY29tL3RsLmNybDAO
-# BgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwbgYDVR0gBGcwZTBj
-# BgZngQwBBAEwWTAmBggrBgEFBQcCARYaaHR0cHM6Ly93d3cudGhhd3RlLmNvbS9j
-# cHMwLwYIKwYBBQUHAgIwIwwhaHR0cHM6Ly93d3cudGhhd3RlLmNvbS9yZXBvc2l0
-# b3J5MFcGCCsGAQUFBwEBBEswSTAfBggrBgEFBQcwAYYTaHR0cDovL3RsLnN5bWNk
-# LmNvbTAmBggrBgEFBQcwAoYaaHR0cDovL3RsLnN5bWNiLmNvbS90bC5jcnQwDQYJ
-# KoZIhvcNAQELBQADggEBAFTkvegvH4KqHVI16TZgiXfIxyjAe7Z073ko2XS+8mxE
-# SQ2S/NGBf7+vur8i7wRdO3zwkWwPeWXZeyITb2myImSxJJdhxi9qWi/SSh2QKXuc
-# zcQ0OY6fr1io9Ug8yH5iEhB7KlHweh8/YhyKnNPsC8cfT6NPxfaA+V7kFa6/oVE+
-# LQVQqXbJkH10N/MwA/ePG9u65lJ90xZChIIXP9cwNp3K0dce+V5sUVb1O5qg2pXH
-# FDH0bIo0BRUOpKZ+WlvMiq6l/MJBYzKDtZbsh4150TQDfWQf1FBykqSPcVdXf7Kq
-# QInJHyUJCeu1LFhozzCM+moGzg7ZgvAA2Csdoj0mpgQxggIBMIIB/QIBATBgMEwx
-# CzAJBgNVBAYTAlVTMRUwEwYDVQQKEwx0aGF3dGUsIEluYy4xJjAkBgNVBAMTHXRo
-# YXd0ZSBTSEEyNTYgQ29kZSBTaWduaW5nIENBAhBbwQIMscOmSL02LV/biYW7MAkG
-# BSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJ
-# AzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMCMG
-# CSqGSIb3DQEJBDEWBBQbHD82fv1qyncFop78rTZTCApprzANBgkqhkiG9w0BAQEF
-# AASCAQAlR6jR8F3sYoDA5G8BTSGnxB37PsDzV34xmwCXwC3w1o668vY8PvjBV5lw
-# YnCG0BE6nPu0XWikki3Z/59knx5QFrEhsalmHdxdP2uS2KWOA5EZV4dtL3J77zh9
-# fSnLOy8VaAAaC9Rk0yUDhVau09WRI3+mjwtSmTp12B53ufi3abBxxZLNpm9rSUnN
-# NSofYuM6uO9SpXe8UopkBBCIY2bzhnvwX70z0XhSIpUDTRcXwYtWv/9QOst0jF8O
-# FYbHO/f8gvEf0IOzv+4XdOhsLCq5cSyIIapToXdjn+9LfjEnIHR45epsMbVY/ZVk
-# b4phChzsTygXNjeNetW7CIopV3W7
-# SIG # End signature block
