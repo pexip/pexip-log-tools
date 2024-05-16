@@ -34,6 +34,10 @@ if (Test-Path 'C:\Program Files\Python39\python.exe') {
 elseif (Test-Path 'C:\Program Files\Python310\python.exe') {
     $PathToPython = 'C:\Program Files\Python310\python.exe'
 }
+# Check if Python 3.11.x is installed
+elseif (Test-Path 'C:\Program Files\Python311\python.exe') {
+    $PathToPython = 'C:\Program Files\Python311\python.exe'
+}
 # Check if Python 3.12.x is installed
 elseif (Test-Path 'C:\Program Files\Python312\python.exe') {
     $PathToPython = 'C:\Program Files\Python312\python.exe'
