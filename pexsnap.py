@@ -264,7 +264,13 @@ def extract_snap(snapshot_output, snapshot_input, decrypt_method, dir): # extrac
     print('Decompressing snapshot')
     try:
         with tarfile.open(snapshot_input) as tar:
-            tar.extractall(path=snapshot_output)
+            # Python 3.12+ gives a deprecation warning if TarFile.extraction_filter is None.
+            # https://docs.python.org/3.12/library/tarfile.html#tarfile-extraction-filter
+            if hasattr(tarfile, 'data_filter'):
+                tar.extractall(filter='data', path=snapshot_output)
+            else:
+                print('Extracting may be unsafe; consider updating Python')
+                tar.extractall(path=snapshot_output)
             print()
     except Exception as e:
         print('Extraction failed:', e)
