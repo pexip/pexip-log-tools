@@ -26,25 +26,37 @@ $programFiles = [Environment]::GetFolderPath('ProgramFiles')
 $appData = [Environment]::GetFolderPath('LocalApplicationData')
 $programFiles86 = [Environment]::GetFolderPath('ProgramFilesX86')
 
-# Check if Python 3.9.x is installed
-if (Test-Path 'C:\Program Files\Python39\python.exe') {
-    $PathToPython = 'C:\Program Files\Python39\python.exe'
+# Check if Python 3.x is installed in Program Files or Local AppData
+if (Test-Path "$programFiles\Python39\python.exe") {
+    $PathToPython = "$programFiles\Python39\python.exe"
 }
-# Check if Python 3.10.x is installed
-elseif (Test-Path 'C:\Program Files\Python310\python.exe') {
-    $PathToPython = 'C:\Program Files\Python310\python.exe'
+elseif (Test-Path "$appData\Programs\Python\Python39\python.exe") {
+    $PathToPython = "$appData\Programs\Python\Python39\python.exe"
 }
-# Check if Python 3.11.x is installed
-elseif (Test-Path 'C:\Program Files\Python311\python.exe') {
-    $PathToPython = 'C:\Program Files\Python311\python.exe'
+# Check if Python 3.10.x is installed in Program Files or Local AppData
+elseif (Test-Path "$programFiles\Python310\python.exe") {
+    $PathToPython = "$programFiles\Python310\python.exe"
 }
-# Check if Python 3.12.x is installed
-elseif (Test-Path 'C:\Program Files\Python312\python.exe') {
-    $PathToPython = 'C:\Program Files\Python312\python.exe'
+elseif (Test-Path "$appData\Programs\Python\Python310\python.exe") {
+    $PathToPython = "$appData\Programs\Python\Python310\python.exe"
+}
+# Check if Python 3.11.x is installed in Program Files or Local AppData
+elseif (Test-Path "$programFiles\Python311\python.exe") {
+    $PathToPython = "$programFiles\Python311\python.exe"
+}
+elseif (Test-Path "$appData\Programs\Python\Python311\python.exe") {
+    $PathToPython = "$appData\Programs\Python\Python311\python.exe"
+}
+# Check if Python 3.12.x is installed in Program Files or Local AppData
+elseif (Test-Path "$programFiles\Python312\python.exe") {
+    $PathToPython = "$programFiles\Python312\python.exe"
+}
+elseif (Test-Path "$appData\Programs\Python\Python312\python.exe") {
+    $PathToPython = "$appData\Programs\Python\Python312\python.exe"
 }
 # Python version not found
 else {
-    Write-Error 'Python 3.9.x, 3.10.x or 3.12.x is not installed on this computer. Pexip Log Tools will not work.'
+    Write-Error 'Python 3.9.x, 3.10.x, 3.11.x, or 3.12.x is not installed on this computer. Pexip Log Tools will not work.'
     Write-Host "Please press Enter to close the window."
     Read-Host
     exit 1  # Exit with an error code to indicate a problem
