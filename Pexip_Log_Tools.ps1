@@ -26,7 +26,7 @@ $programFiles = [Environment]::GetFolderPath('ProgramFiles')
 $appData = [Environment]::GetFolderPath('LocalApplicationData')
 $programFiles86 = [Environment]::GetFolderPath('ProgramFilesX86')
 
-# Check if Python 3.x is installed in Program Files or Local AppData
+# Check if Python 3.9 is installed in Program Files or Local AppData
 if (Test-Path "$programFiles\Python39\python.exe") {
     $PathToPython = "$programFiles\Python39\python.exe"
 }
@@ -610,7 +610,7 @@ function Split-PexLogs {
                     # Gather the support log files together and separate out other files
                     if (Select-String -Path $Log -Pattern "\^M" -quiet) {
                         # Gather the support log files together and separate out other files
-                        if ($Log | Select-String -Pattern "support\.[log|txt]") {
+                        if ($Log | Select-String -Pattern "support\.[log|txt]|developer\.[log|txt]") {
                             $SupportLogArray += $Log
                         }
                         else {
