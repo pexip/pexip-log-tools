@@ -96,7 +96,7 @@ class DBAnalyser:
             start = 1
             osstatus_next = osstatus_file
         else:
-            for ind in range(1, 50):
+            for ind in range(1, 150):
                 osstatus_next = osstatus_file + '.' + str(ind)
                 if os.path.exists(osstatus_next):
                     start = ind + 1
@@ -105,7 +105,7 @@ class DBAnalyser:
         if start is not None:
             self.osstatus = self._read_osstatus(osstatus_next)
             mtime = os.path.getmtime(osstatus_next) - 4200
-            for ind in range(start, 50):
+            for ind in range(start, 150):
                 osstatus_next = osstatus_file + '.' + str(ind)
                 if not os.path.exists(osstatus_next) or os.path.getmtime(osstatus_next) < mtime:
                     break
