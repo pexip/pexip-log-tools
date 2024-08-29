@@ -91,10 +91,21 @@ class DBAnalyser:
 
         osstatus_file = os.path.join(rootdir, 'var/log/unified_osstatus.log')
         self.osstatus = {}  # hostname -> status
+        start = None
         if os.path.exists(osstatus_file):
-            self.osstatus = self._read_osstatus(osstatus_file)
-            mtime = os.path.getmtime(osstatus_file) - 4200
+            start = 1
+            osstatus_next = osstatus_file
+        else:
             for ind in range(1, 50):
+                osstatus_next = osstatus_file + '.' + str(ind)
+                if os.path.exists(osstatus_next):
+                    start = ind + 1
+                    break
+
+        if start is not None:
+            self.osstatus = self._read_osstatus(osstatus_next)
+            mtime = os.path.getmtime(osstatus_next) - 4200
+            for ind in range(start, 50):
                 osstatus_next = osstatus_file + '.' + str(ind)
                 if not os.path.exists(osstatus_next) or os.path.getmtime(osstatus_next) < mtime:
                     break
@@ -985,7 +996,8 @@ class DBAnalyser:
             fqdn = "%s.%s" % (worker['hostname'], worker['domain'])
             if worker['alternative_fqdn']:
                 fqdn += ' [%s]' % worker['alternative_fqdn']
-            tlscerts[worker['tls_certificate_id']].append(fqdn)
+            if worker['tls_certificate_id'] in tlscerts:
+                tlscerts[worker['tls_certificate_id']].append(fqdn)
 
         for cert_id in tlscerts.keys():
             if len(tlscerts[cert_id]) == 0:
