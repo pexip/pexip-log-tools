@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """logreader: pass list of unified_support logs as a parameter."""
 
-# Copyright 2023 Pexip AS
+# Copyright 2024 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1676,17 +1676,20 @@ class TeamsMessage(Message):
         if "media" in self.payload:
             keys = ["audio", "video", "presentation"]
             vals = []
-            for key in keys:
-                if key in self.payload["media"]:
-                    vals.append(
-                        "{} {}:{}".format(
-                            key,
-                            self.payload["media"][key]["address"],
-                            self.payload["media"][key]["port"],
+            if self.payload["media"]:
+                for key in keys:
+                    if key in self.payload["media"]:
+                        vals.append(
+                            "{} {}:{}".format(
+                                key,
+                                self.payload["media"][key]["address"],
+                                self.payload["media"][key]["port"],
+                            )
                         )
-                    )
-            if vals:
-                ret += "\n" + " " * indent + "; ".join(vals)
+                if vals:
+                    ret += "\n" + " " * indent + "; ".join(vals)
+            else:
+                ret += "\n" + " " * indent + "[No media]"
 
         if self.payload.get("treat_as_trusted"):
             ret += " [Trusted]"
