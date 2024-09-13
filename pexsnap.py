@@ -106,6 +106,10 @@ external_scripts = {
         'logfile':'pex_report_logreader.log',
         'script':script_location+'/logreader.py'
     },
+    'logspam': {
+        'logfile':'pex_report_logspam.log',
+        'script':script_location+'/log_spam.py'
+    },
     'mjx_summary': {
         'logfile':'pex_report_mjxsummary.log',
         'script':script_location+'/mjxsummary.py'
