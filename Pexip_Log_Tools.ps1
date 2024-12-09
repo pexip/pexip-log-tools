@@ -135,11 +135,18 @@ function Test-PexEnvironment {
                 $fullPath = Join-Path $appData\Programs $path
 
                 if (-not (Test-Path $fullPath)) {
-                    # Check if the missing application is required
-                    if (($appName -eq "Notepad++" -and $OpenInNotepadPlusPlus) -or ($appName -eq "Sublime Text 3" -and $OpenInSublime) -or ($appName -eq "grepWin 1.6.16")) {
-                        Write-Error "File not found: $path in $programFiles86 or $appData or $programFiles. Please re-install the missing file in either of these locations and try again. If the application was recently installed, restart your PC."
-                        Read-Host
-                        exit 1  # Exit with an error code to indicate a problem
+                    $fullPath = Join-Path $appData\Apps $path
+
+                    if (-not (Test-Path $fullPath)) {
+                        # Check if the missing application is required
+                        if (($appName -eq "Notepad++" -and $OpenInNotepadPlusPlus) -or ($appName -eq "Sublime Text 3" -and $OpenInSublime) -or ($appName -eq "grepWin 1.6.16")) {
+                            Write-Error "File not found: $path in $programFiles86, $appData\Programs, $appData\Apps, or $programFiles. Please re-install the missing file in either of these locations and try again. If the application was recently installed, restart your PC."
+                            Read-Host
+                            exit 1  # Exit with an error code to indicate a problem
+                        }
+                    } else {
+                        # Update global variables with the full path
+                        UpdateGlobalPathVariables $appName $fullPath
                     }
                 } else {
                     # Update global variables with the full path
