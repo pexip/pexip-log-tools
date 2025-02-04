@@ -2480,6 +2480,7 @@ def summarise(fi, fo, filter_name=None, protocol_filter=None, no_spam=False):
                     "support.rtmp",
                     "support.gms",
                     "support.teams",
+                    "support.dtmf",
                     "dtmflatcher",
                     "dtmf_latcher",
                 ]

@@ -373,7 +373,7 @@ class DBAnalyser:
             print()
             print("Logs set to debug: " + ', '.join(debuglogs))
 
-        if 'default_webapp_alias_id' in platform_global:
+        if 'default_webapp_alias_id' in platform_global and platform_global['default_webapp_alias_id']:
             platform_webappalias = self._builddict(self.configuration, 'platform_webappalias', ('slug', 'webapp_type'), 'id')
             defaultalias = platform_webappalias[platform_global['default_webapp_alias_id']]
             print("Default webapp: /%s (%s)" % (defaultalias['slug'], defaultalias['webapp_type'].capitalize()))
