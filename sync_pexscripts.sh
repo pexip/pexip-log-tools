@@ -166,8 +166,8 @@ function first_run_create_and_setup_venv() {
 }
 
 function first_run_create_run_script() {
-    # Create the run script
-    cat > /usr/local/bin/pexsnap << EOL
+    # Create the run scrip
+    sudo tee /usr/local/bin/pexsnap <<EOF
 #!$SHELL_BIN
 # Activate the virtual environment
 source $PEX_DIR/.venv/bin/activate
@@ -182,9 +182,9 @@ fi
 
 # Deactivate the virtual environment
 deactivate
-EOL
-    chmod +x /usr/local/bin/pexsnap
-    chown $USER /usr/local/bin/pexsnap
+EOF > /dev/null 2>&1
+    sudo chmod +x /usr/local/bin/pexsnap
+    sudo chown $USER /usr/local/bin/pexsnap
 }
 
 function set_permissions() {
@@ -224,6 +224,9 @@ if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
     if [ ! -d $PEX_DIR/.venv ]; then
         print_step 'Migrating to venv...'
         first_run_create_and_setup_venv
+        if [ -f /usr/local/bin/pexsnap ]; then
+            sudo rm -f /usr/local/bin/pexsnap
+        fi
         first_run_create_run_script
         touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
         rm -f $PEX_DIR/.sync_pexscripts_v3
