@@ -33,6 +33,7 @@ declare -a PEX_SCRIPTS=("confhistory.py" "connectivity.py" "dbsummary.py" "logre
 DEBUG=0
 
 #####################################################################
+CURRENT_VERSION=v4
 SHELL_BIN=`echo $SHELL`
 
 # Check for debug flag
@@ -80,7 +81,7 @@ function first_run_add_cron() {
     echo "# Download pexscripts (10:00 Mon-Fri)" >> $PEX_DIR/.cron
     echo "5 10 * * * $PEX_DIR/sync_pexscripts.sh >/dev/null 2>&1" >> $PEX_DIR/.cron
     crontab $PEX_DIR/.cron
-    rm -f $PEX_DIR/.cron && touch $PEX_DIR/.sync_pexscripts_v3
+    rm -f $PEX_DIR/.cron && touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
 }
 
 function install_xcode() {
@@ -124,8 +125,8 @@ function first_run_link_pexscripts() {
     fi
     for i in "${PEX_SCRIPTS[@]}"
     do
-        # If file exsits don't remove previous py2 symlinks
-        if [ ! -f $PEX_DIR/.sync_pexscripts_v3 ]; then
+        # Remove the old symlink if the lock file is missing
+        if [ ! -f $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION ]; then
             sudo rm -f /usr/local/bin/$i
         fi
         # remove .py extension from the symlink
@@ -218,8 +219,19 @@ create_pexscripts_dir
 backup_pexscripts
 # Download scripts from the Pexip GitHub repo
 download_pexscripts
+# Check for existing v3 environment and migrate to venv
+if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
+    if [ ! -d $PEX_DIR/.venv ]; then
+        print_step 'Migrating to venv...'
+        first_run_create_and_setup_venv
+        first_run_create_run_script
+        touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
+        rm -f $PEX_DIR/.sync_pexscripts_v3
+        exit 0;
+    fi
+fi
 # First time setup? Check for lock file...
-if [ ! -f $PEX_DIR/.sync_pexscripts_v3 ]; then
+if [ ! -f $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION ]; then
     BREW_INSTALLED=0
     # Remove the old pexscripts lock file
     first_run_remove_old_lock_file
