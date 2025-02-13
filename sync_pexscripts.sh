@@ -227,6 +227,7 @@ if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
         first_run_create_run_script
         touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
         rm -f $PEX_DIR/.sync_pexscripts_v3
+        print_step 'Migration complete!'
         exit 0;
     fi
 fi
