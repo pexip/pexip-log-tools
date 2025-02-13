@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023 Pexip AS
+# Copyright 2025 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -273,7 +273,7 @@ def extract_snap(snapshot_output, snapshot_input, decrypt_method, dir): # extrac
             if hasattr(tarfile, 'data_filter'):
                 tar.extractall(filter='data', path=snapshot_output)
             else:
-                print('Extracting may be unsafe; consider updating Python')
+                print('Extracting may be unsafe; consider updating Python - https://peps.python.org/pep-0706/')
                 tar.extractall(path=snapshot_output)
             print()
     except Exception as e:
