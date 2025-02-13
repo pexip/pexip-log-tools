@@ -166,7 +166,7 @@ function first_run_create_and_setup_venv() {
 }
 
 function first_run_create_run_script() {
-    # Create the run scrip
+    # Create the run script
     sudo tee /usr/local/bin/pexsnap <<EOF
 #!$SHELL_BIN
 # Activate the virtual environment
@@ -182,7 +182,7 @@ fi
 
 # Deactivate the virtual environment
 deactivate
-EOF > /dev/null 2>&1
+EOF
     sudo chmod +x /usr/local/bin/pexsnap
     sudo chown $USER /usr/local/bin/pexsnap
 }
