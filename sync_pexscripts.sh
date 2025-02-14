@@ -195,13 +195,12 @@ EOF
 
 function first_run_update_zshrc() {
     # Update the .zshrc file
-    print_step "Please select a snapshot folder:\n"
-    select d in ~/Downloads/*/; do
-        test -n "$d" && break;
-        echo ">>> Invalid Selection";
-    done
-    snapshot_dir=$(realpath $d)
-    if [ -d $snapshot_dir ]; then
+    echo "Please select a snapshot folder:\n"
+    read folder
+    # realpath does not like ~ in the path so get current working directory
+    basedir="$( pwd -P )" 
+    if [ -d $(realpath $basedir/$folder) ]; then
+        snapshot_dir=$(realpath $basedir/$folder)
         tee -a ~/.zshrc &>/dev/null <<EOF
 # Automatically activate Python venv if it exists
 auto_snapshot_venv() {
@@ -218,7 +217,8 @@ cd() {
 }
 EOF
     else
-        echo "Failed to resolve the path."
+        echo "Invalid path. Please try again."
+        exit 1
     fi
 }
 
