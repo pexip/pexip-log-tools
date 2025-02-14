@@ -233,7 +233,7 @@ function first_run_update_zshrc() {
             select yn in "Yes" "No"; do
                 case $yn in
                     Yes )
-                        echo "Creating directory: $snap_dir"
+                        print_step "Creating directory: $snap_dir"
                         mkdir -p $snap_dir
                         update_zshrc_using_tee
                         break;;
