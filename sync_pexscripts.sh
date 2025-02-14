@@ -172,7 +172,7 @@ function first_run_create_run_scripts() {
         if [ -f /usr/local/bin/${i%.py} ]; then
             sudo rm -f /usr/local/bin/${i%.py}
         fi
-        sudo tee /usr/local/bin/${i%.py} <<EOF
+        sudo tee /usr/local/bin/${i%.py} &>/dev/null <<EOF
 #!$SHELL_BIN
 # Activate the virtual environment
 source $PEX_DIR/.venv/bin/activate
@@ -191,6 +191,35 @@ EOF
         sudo chmod +x /usr/local/bin/${i%.py}
         sudo chown $USER /usr/local/bin/${i%.py}
     done
+}
+
+function first_run_update_zshrc() {
+    # Update the .zshrc file
+    print_step "Please select a snapshot folder:\n"
+    select d in ~/Downloads/*/; do
+        test -n "$d" && break;
+        echo ">>> Invalid Selection";
+    done
+    snapshot_dir=$(realpath $d)
+    if [ -d $snapshot_dir ]; then
+        tee -a ~/.zshrc &>/dev/null <<EOF
+# Automatically activate Python venv if it exists
+auto_snapshot_venv() {
+    if [[ "\$PWD" =~ ^$snapshot_dir ]]; then
+        source $PEX_DIR/.venv/bin/activate
+    elif [ "\$VIRTUAL_ENV" != "" ] && [[ ! -e "\$PWD/.venv" || ! -e "\$PWD/venv" ]]; then
+        deactivate
+    fi
+}
+
+# Override the 'cd' command to call our function
+cd() {
+    builtin cd "\$@" && auto_snapshot_venv
+}
+EOF
+    else
+        echo "Failed to resolve the path."
+    fi
 }
 
 function set_permissions() {
@@ -231,6 +260,16 @@ if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
         print_step 'Migrating to venv...'
         first_run_create_and_setup_venv
         first_run_create_run_scripts
+        print_step "Update .zshrc file to automatically activate venv?"
+        select yn in "Yes" "No"; do
+            case $yn in
+                Yes ) 
+                    first_run_update_zshrc
+                    break;;
+                No )
+                    break;;
+            esac
+        done
         touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
         rm -f $PEX_DIR/.sync_pexscripts_v3
         print_step 'Migration complete!'
@@ -286,6 +325,17 @@ if [ ! -f $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION ]; then
     first_run_create_and_setup_venv
     # Create the run script
     first_run_create_run_script
+    # Update the .zshrc file
+    print_step "Update .zshrc file to automatically activate venv?"
+    select yn in "Yes" "No"; do
+        case $yn in
+            Yes ) 
+                first_run_update_zshrc
+                break;;
+            No )
+                break;;
+        esac
+    done
 fi
 
 # Set permissions
