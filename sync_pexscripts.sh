@@ -165,34 +165,6 @@ function first_run_create_and_setup_venv() {
     cd -
 }
 
-function first_run_create_run_scripts() {
-    # Create the run scripts
-    for i in "${PEX_SCRIPTS[@]}"
-    do
-        if [ -f /usr/local/bin/${i%.py} ]; then
-            sudo rm -f /usr/local/bin/${i%.py}
-        fi
-        sudo tee /usr/local/bin/${i%.py} &>/dev/null <<EOF
-#!$SHELL_BIN
-# Activate the virtual environment
-source $PEX_DIR/.venv/bin/activate
-
-# Run the Python script
-if [[ "\$VIRTUAL_ENV" != "" ]]; then
-    $PEX_DIR/.venv/bin/python $PEX_DIR/$i "\$@"
-else
-    echo "Error activating virtual environment!"
-    exit 1
-fi
-
-# Deactivate the virtual environment
-deactivate
-EOF
-        sudo chmod +x /usr/local/bin/${i%.py}
-        sudo chown $USER /usr/local/bin/${i%.py}
-    done
-}
-
 function update_zshrc_using_tee(){
     # Update the .zshrc file
     tee -a ~/.zshrc &>/dev/null <<EOF
@@ -256,19 +228,37 @@ function set_permissions() {
     fi
 }
 
-function create_links_and_set_x() {
-    # Create links and make scripts executable
+function create_runfiles_and_set_x() {
+    # Create the run scripts
     for i in "${PEX_SCRIPTS[@]}"
     do
-        if [[ $i =~ 'pexsnap.py' ]]; then
-            if [ ! -f /usr/local/bin/${i%.py} ]; then
-                sudo touch /usr/local/bin/${i%.py}
-            fi
+        if [[ $i =~ 'sync_pexscripts.sh' ]]; then
+            sudo rm -f /usr/local/bin/${i%.py}
+            sudo ln -sf $PEX_DIR/$i /usr/local/bin/${i%.py}
             sudo chmod +x $PEX_DIR/$i && sudo chown $USER /usr/local/bin/${i%.py}
             continue
         fi
-        sudo ln -sf $PEX_DIR/$i /usr/local/bin/${i%.py}
-        sudo chmod +x $PEX_DIR/$i && sudo chown $USER /usr/local/bin/${i%.py}
+        if [ -f /usr/local/bin/${i%.py} ]; then
+            sudo rm -f /usr/local/bin/${i%.py}
+        fi
+        sudo tee /usr/local/bin/${i%.py} &>/dev/null <<EOF
+#!$SHELL_BIN
+# Activate the virtual environment
+source $PEX_DIR/.venv/bin/activate
+
+# Run the Python script
+if [[ "\$VIRTUAL_ENV" != "" ]]; then
+    $PEX_DIR/.venv/bin/python $PEX_DIR/$i "\$@"
+else
+    echo "Error activating virtual environment!"
+    exit 1
+fi
+
+# Deactivate the virtual environment
+deactivate
+EOF
+        sudo chmod +x /usr/local/bin/${i%.py}
+        sudo chown $USER /usr/local/bin/${i%.py}
     done
 }
 
@@ -284,7 +274,7 @@ if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
     if [ ! -d $PEX_DIR/.venv ]; then
         print_step 'Migrating to venv...'
         first_run_create_and_setup_venv
-        first_run_create_run_scripts
+        create_runfiles_and_set_x
         print_step "Update .zshrc file to automatically activate venv?"
         select yn in "Yes" "No"; do
             case $yn in
@@ -348,8 +338,6 @@ if [ ! -f $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION ]; then
 
     # Create the virtual environment and install dependencies
     first_run_create_and_setup_venv
-    # Create the run script
-    first_run_create_run_script
     # Update the .zshrc file
     print_step "Update .zshrc file to automatically activate venv?"
     select yn in "Yes" "No"; do
@@ -365,8 +353,8 @@ fi
 
 # Set permissions
 set_permissions
-# Create symlinks and set executable
-create_links_and_set_x
+# Create runfiles and set executable
+create_runfiles_and_set_x
 
 # Finished
 print_step 'Sync complete!'
