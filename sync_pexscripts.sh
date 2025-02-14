@@ -193,18 +193,12 @@ EOF
     done
 }
 
-function first_run_update_zshrc() {
+function update_zshrc_using_tee(){
     # Update the .zshrc file
-    echo "Please select a snapshot folder:\n"
-    read folder
-    # realpath does not like ~ in the path so get current working directory
-    basedir="$( pwd -P )" 
-    if [ -d $(realpath $basedir/$folder) ]; then
-        snapshot_dir=$(realpath $basedir/$folder)
-        tee -a ~/.zshrc &>/dev/null <<EOF
+    tee -a ~/.zshrc &>/dev/null <<EOF
 # Automatically activate Python venv if it exists
 auto_snapshot_venv() {
-    if [[ "\$PWD" =~ ^$snapshot_dir ]]; then
+    if [[ "\$PWD" =~ ^$snap_dir ]]; then
         source $PEX_DIR/.venv/bin/activate
     elif [ "\$VIRTUAL_ENV" != "" ] && [[ ! -e "\$PWD/.venv" || ! -e "\$PWD/venv" ]]; then
         deactivate
@@ -216,10 +210,41 @@ cd() {
     builtin cd "\$@" && auto_snapshot_venv
 }
 EOF
-    else
-        echo "Invalid path. Please try again."
-        exit 1
-    fi
+}
+
+function first_run_update_zshrc() {
+    # Update the .zshrc file
+    while :; do
+        print_step "Enter the path to the snapshot directory:"
+        read directory
+
+        # Check if the directory is a tilde path
+        if [[ $directory == "~"* ]]; then
+            snap_dir="${directory/#\~/$HOME}"
+        else
+            snap_dir="$PWD/$directory"
+        fi
+
+        if [ -d "$snap_dir" ]; then
+            update_zshrc_using_tee
+            break
+        else
+            print_step "$snap_dir does not exist, create it?"
+            select yn in "Yes" "No"; do
+                case $yn in
+                    Yes )
+                        echo "Creating directory: $snap_dir"
+                        mkdir -p $snap_dir
+                        update_zshrc_using_tee
+                        break;;
+                    No )
+                        print_step "Exiting..."
+                        break;;
+                esac
+            done
+            break
+        fi
+    done
 }
 
 function set_permissions() {
