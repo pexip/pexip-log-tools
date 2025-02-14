@@ -165,16 +165,21 @@ function first_run_create_and_setup_venv() {
     cd -
 }
 
-function first_run_create_run_script() {
-    # Create the run script
-    sudo tee /usr/local/bin/pexsnap <<EOF
+function first_run_create_run_scripts() {
+    # Create the run scripts
+    for i in "${PEX_SCRIPTS[@]}"
+    do
+        if [ -f /usr/local/bin/${i%.py} ]; then
+            sudo rm -f /usr/local/bin/${i%.py}
+        fi
+        sudo tee /usr/local/bin/${i%.py} <<EOF
 #!$SHELL_BIN
 # Activate the virtual environment
 source $PEX_DIR/.venv/bin/activate
 
 # Run the Python script
 if [[ "\$VIRTUAL_ENV" != "" ]]; then
-    $PEX_DIR/.venv/bin/python $PEX_DIR/pexsnap.py "\$@"
+    $PEX_DIR/.venv/bin/python $PEX_DIR/$i "\$@"
 else
     echo "Error activating virtual environment!"
     exit 1
@@ -183,8 +188,9 @@ fi
 # Deactivate the virtual environment
 deactivate
 EOF
-    sudo chmod +x /usr/local/bin/pexsnap
-    sudo chown $USER /usr/local/bin/pexsnap
+        sudo chmod +x /usr/local/bin/${i%.py}
+        sudo chown $USER /usr/local/bin/${i%.py}
+    done
 }
 
 function set_permissions() {
@@ -224,10 +230,7 @@ if [ -f $PEX_DIR/.sync_pexscripts_v3 ]; then
     if [ ! -d $PEX_DIR/.venv ]; then
         print_step 'Migrating to venv...'
         first_run_create_and_setup_venv
-        if [ -f /usr/local/bin/pexsnap ]; then
-            sudo rm -f /usr/local/bin/pexsnap
-        fi
-        first_run_create_run_script
+        first_run_create_run_scripts
         touch $PEX_DIR/.sync_pexscripts_$CURRENT_VERSION
         rm -f $PEX_DIR/.sync_pexscripts_v3
         print_step 'Migration complete!'
