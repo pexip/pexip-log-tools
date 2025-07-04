@@ -712,9 +712,12 @@ class RESTMessage(Message):
         self.tag_participant_map = None
         self.ssrc_stream_id_map = None
         self.external_participant_count = 0
+        self.to_addr = ""
 
         urlpath = list(filter(None, urlparse(request).path.split("/")))
-        self.to_addr = urlpath[urlpath.index("conferences") + 1]
+        to_addr_idx = urlpath.index("conferences") + 1
+        if to_addr_idx < len(urlpath):
+            self.to_addr = urlpath[to_addr_idx]
         self.method = urlpath[-1].upper()
 
         try:
@@ -890,7 +893,12 @@ class RESTMessage(Message):
                 )
 
             if "digits" in self.payload:
-                ret += " (Digits: {})".format(self.payload["digits"])
+                if self.participant:
+                    ret += " (Participant-ID: {}, Digits: {})".format(
+                        self.participant, self.payload["digits"]
+                    )
+                else:
+                    ret += " (Digits: {})".format(self.payload["digits"])
 
             if "candidate" in self.payload:
                 if self.payload["candidate"]:
@@ -920,6 +928,9 @@ class RESTMessage(Message):
 
             if "mix_name" in self.payload:
                 ret += f" (Mix name: {self.payload['mix_name']})"
+
+            if "layout_group" in self.payload:
+                ret += f" (Participant-ID: {self.participant}, Layout group: {self.payload['layout_group']})"
 
             if (
                 self.method == "PREFERRED_ASPECT_RATIO"
@@ -953,7 +964,7 @@ class RESTMessage(Message):
                 for participant in self.payload["participants"]:
                     ret += "\n{}+ {}".format(" " * indent, participant)
 
-            if not self.out and self.method == "CALLS" and self.participant:
+            if not self.out and not ret and self.participant:
                 ret += f" (Participant-ID: {self.participant})"
 
             # Teams method
@@ -1391,7 +1402,10 @@ class GMSMessage(Message):
         if self.type == "data-channel" or self.msg == "Received GMS notification":
             self._parse_type_data_channel(fields)
         else:
-            self._parse_type_http(fields)
+            try:
+                self._parse_type_http(fields)
+            except ValueError:
+                self._parse_type_data_channel(fields)
 
     def _parse_type_http(self, fields):
         lines = fields.get("detail").split("^M")
@@ -1734,9 +1748,7 @@ class LogMessage(Message):
         presenter = self.fields.get("presenter", self.fields.get("last-presenter"))
         if presenter:
             ret += f", presenter = {presenter}"
-        #        conversation_id = self.fields.get("conversation-id")
-        #        if conversation_id:
-        #            ret += ", conversation-id = %s" % conversation_id
+
         detail = self.fields.get("detail")
         if "dst-address" in self.fields:
             ret += " towards {}:{} [{}]".format(
@@ -1747,6 +1759,9 @@ class LogMessage(Message):
 
         if "state" in self.fields:
             ret += ", state = {}".format(self.fields.get("state"))
+
+        if "layout-group" in self.fields:
+            ret += ", layout-group = {}".format(self.fields.get("layout-group"))
 
         if "breakout-room" in self.fields:
             ret += "\n{}   Conference: {}".format(
