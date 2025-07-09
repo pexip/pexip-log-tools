@@ -38,6 +38,10 @@ except Exception:
 
 try:
     from cryptography import x509
+    from cryptography.x509.general_name import (
+        DNSName,
+        IPAddress
+    )
     do_ssl = True
 except ImportError:
     do_ssl = False
@@ -1017,14 +1021,20 @@ class DBAnalyser:
                     'Signature': cert.signature_algorithm_oid._name.encode(),
                     'Hosts': [fqdn] }
 
-            san = None
+            san = []
             for ext in cert.extensions:
                 if ext.oid == x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
-                    san = ext.value.get_values_for_type(x509.DNSName)
+                    for entry in ext.value:
+                        # valid instances are documented at:
+                        # https://github.com/pyca/cryptography/blob/main/src/cryptography/x509/general_name.py
+                        if isinstance(entry, DNSName):
+                            san.append(f'DNS:{entry.value}')
+                        if isinstance(entry, IPAddress):
+                            san.append(f'IP:{entry.value}')
                     break
 
             if san:
-                data['SANs'] = ', '.join(f'DNS:{san}' for san in san)
+                data['SANs'] = ', '.join(san)
 
             if sn in certs:
                 certs[sn]['Hosts'].append(fqdn)
