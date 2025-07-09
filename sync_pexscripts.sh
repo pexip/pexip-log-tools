@@ -155,7 +155,7 @@ function first_run_create_and_setup_venv() {
         python3 -m pip install --upgrade pip
         print_step 'Installing python dependencies...'
         python3 -m pip install lxml
-        python3 -m pip install pyOpenSSL
+        python3 -m pip install cryptography
         python3 -m pip install dnspython
         deactivate
     else
