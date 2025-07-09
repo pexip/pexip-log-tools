@@ -21,7 +21,6 @@ import operator
 import os
 import re
 import sqlite3
-import socket
 import sys
 from datetime import datetime, timedelta
 
@@ -38,7 +37,11 @@ except Exception:
     pass
 
 try:
-    from OpenSSL import crypto
+    from cryptography import x509
+    from cryptography.x509.general_name import (
+        DNSName,
+        IPAddress
+    )
     do_ssl = True
 except ImportError:
     do_ssl = False
@@ -969,15 +972,14 @@ class DBAnalyser:
 
         for cacert in cacerts:
             try:
-                cert = crypto.load_certificate(crypto.FILETYPE_PEM, cacert)
-            except (IOError, crypto.Error):
+                cert = x509.load_pem_x509_certificate(cacert.encode())
+            except ValueError:
                 continue
 
-            cn = dict(cert.get_subject().get_components()).get(b'CN', b"").decode()
-            data = {'CN': cn,
-                    'Issuer': dict(cert.get_issuer().get_components()).get(b'CN', b"").decode(),
-                    'Expiry': datetime.strptime(cert.get_notAfter().decode(), "%Y%m%d%H%M%SZ")}
-            intermediates[cn] = data
+            data = {'CN': cert.subject.rfc4514_string(),
+                    'Issuer': cert.issuer.rfc4514_string(),
+                    'Expiry': cert.not_valid_after_utc,}
+            intermediates[cert.subject.rfc4514_string()] = data
 
 
         def validate_issuer(issuer):
@@ -1005,28 +1007,34 @@ class DBAnalyser:
                 continue
 
             try:
-                cert = crypto.load_certificate(crypto.FILETYPE_PEM, platform_tlscertificate[cert_id]['certificate'])
-            except (IOError, crypto.Error):
+                cert = x509.load_pem_x509_certificate(platform_tlscertificate[cert_id]['certificate'].encode())
+            except ValueError:
                 continue
 
             fqdn = ', '.join(tlscerts[cert_id])
-            sn = cert.get_serial_number()
-            issuer = dict(cert.get_issuer().get_components()).get(b'CN', b"").decode()
-            data = {'CN': dict(cert.get_subject().get_components()).get(b'CN', b"").decode(),
+            sn = cert.serial_number
+            issuer = cert.issuer.rfc4514_string()
+            data = {'CN': cert.subject.rfc4514_string(),
                     'Issuer': issuer,
                     'Chain': validate_issuer(issuer),
-                    'Expiry': datetime.strptime(cert.get_notAfter().decode(), "%Y%m%d%H%M%SZ"),
-                    'Signature': cert.get_signature_algorithm(),
+                    'Expiry': cert.not_valid_after_utc,
+                    'Signature': cert.signature_algorithm_oid._name.encode(),
                     'Hosts': [fqdn] }
 
-            san = None
-            for i in range(cert.get_extension_count()):
-                if cert.get_extension(i).get_short_name() == b'subjectAltName':
-                    san = cert.get_extension(i)
+            san = []
+            for ext in cert.extensions:
+                if ext.oid == x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                    for entry in ext.value:
+                        # valid instances are documented at:
+                        # https://github.com/pyca/cryptography/blob/main/src/cryptography/x509/general_name.py
+                        if isinstance(entry, DNSName):
+                            san.append(f'DNS:{entry.value}')
+                        if isinstance(entry, IPAddress):
+                            san.append(f'IP:{entry.value}')
                     break
 
             if san:
-                data['SANs'] = str(san)
+                data['SANs'] = ', '.join(san)
 
             if sn in certs:
                 certs[sn]['Hosts'].append(fqdn)
