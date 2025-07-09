@@ -276,7 +276,7 @@ class PexAuth:
                     print(f'OAuth2 client #{idx}: {item["client_name"]}')
                     print(f'    Client ID: {item["client_id"]}')
                     print(f'    Administrator role: {self.permissions_oauth2token_table[item["id"]][0]}')
-                    print(f'    Role mapping: {self.authentication_role_mapping_table[[item["role_id"]][0]]["value"]}')
+                    print(f'    Role mapping: {self.authentication_role_mapping_table[[item["role_id"]][0]]["value"] if item["role_id"] in self.authentication_role_mapping_table else "None"}')
                     print()
         if self.version['version-id'] >= '34':
             if self.permissions_oauth2tokens_table:
