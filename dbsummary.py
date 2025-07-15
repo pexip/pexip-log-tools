@@ -120,8 +120,7 @@ class SecurityCheck:
                 continue
             if data[key] != defaults[key]:
                 if key not in changes:
-                    changes[key] = []
-                changes[key].append(data[key])
+                    changes[key] = data[key]
 
         return changes
 
@@ -929,7 +928,7 @@ class DBAnalyser:
                 print("Security Wizard Changes")
                 print(len("Security Wizard Changes") * "=")
                 for key in sorted(security_changes.keys()):
-                    print("%s: %s" % (key, security_changes[key][0]))
+                    print("%s: %s" % (key, security_changes[key]))
 
             print()
 
