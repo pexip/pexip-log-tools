@@ -114,14 +114,7 @@ class SecurityCheck:
             return None
 
         defaults = self._security_defaults()
-        changes = {}
-        for key in data.keys():
-            if key not in defaults:
-                continue
-            if data[key] != defaults[key]:
-                if key not in changes:
-                    changes[key] = data[key]
-
+        changes = {k: v for k, v in data.items() if v != defaults.get(k)}
         return changes
 
 
@@ -927,8 +920,7 @@ class DBAnalyser:
                 print()
                 print("Security Wizard Changes")
                 print(len("Security Wizard Changes") * "=")
-                for key in sorted(security_changes.keys()):
-                    print("%s: %s" % (key, security_changes[key]))
+                [print(f"{k}: {security_changes[k]}") for k in sorted(security_changes.keys())]
 
             print()
 
