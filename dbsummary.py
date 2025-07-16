@@ -60,6 +60,62 @@ def tabulate(data):
             print(" " * (lengths[ind] - len(str(row[ind]))), end=" ")
         print("")
 
+
+class SecurityCheck:
+    """Check the security.json file for changes."""
+
+    SECURITY_DEFAULTS = {
+        "cca_id": "",
+        "disable_admin_account": False,
+        "drop_not_reject": True,
+        "enable_aes128_sha": False,
+        "enable_fir": False,
+        "enable_frame_deny": True,
+        "enable_hsts_preload": False,
+        "enable_referrer_policy": True,
+        "enable_sip_aes128_sha": True,
+        "enable_sip_tls_adh": False,
+        "enable_sip_tls_cert_tolerate_ip_address": False,
+        "enable_tls1": False,
+        "enable_web_allowed_hosts_validation": False,
+        "enable_worker_csp": False,
+        "fips_mode": False,
+        "icmpv6_echo_requests": True,
+        "icmpv6_redirects": False,
+        "ipv6_dad_transmits": True,
+        "permit_https_old_tls": False,
+        "require_encrypted_media": False,
+        "resource_priority_prefix": "",
+        "sip_tcp_port": 5060,
+        "sip_tls_port": 5061,
+        "sip_udp_port": 5060,
+        "web_global_session_limit": None,
+        "web_per_user_session_limit": None,
+        "enable_srtp_hmac_sha1": True,
+        "enable_tls12_cbc": True,
+        "enable_h323_2048bit_dh": False
+    }
+
+    def __init__(self, rootdir: str):
+        self.json_file = os.path.join(rootdir, 'etc/pexip/security/security.json')
+        if not os.path.exists(self.json_file):
+            return None
+
+    def read_security_json(self) -> dict | None:
+        """Read the security.json file and check for any changes."""
+        try:
+            with open(self.json_file, 'r') as fh:
+                data = json.load(fh)
+        except (IOError, ValueError):
+            return None
+
+        if not isinstance(data, dict):
+            return None
+
+        changes = {k: v for k, v in data.items() if v != self.SECURITY_DEFAULTS.get(k)}
+        return changes
+
+
 class DBAnalyser:
     def __init__(self, rootdir):
         if os.path.isdir(os.path.join(rootdir, 'opt/pexip/share/status/db')):
@@ -853,6 +909,15 @@ class DBAnalyser:
 
             for (key, val) in platform_tuneables.items():
                 print("{}: {}".format(key, val['setting']))
+
+            print()
+
+        security_changes = SecurityCheck(rootdir).read_security_json()
+        if security_changes:
+            print()
+            print("Security Wizard Changes")
+            print(len("Security Wizard Changes") * "=")
+            [print(f"{k}: {security_changes[k]}") for k in sorted(security_changes.keys())]
 
             print()
 
