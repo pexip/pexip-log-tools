@@ -101,7 +101,9 @@ class SecurityCheck:
         if not os.path.exists(self.json_file):
             return None
 
-    def read_security_json(self) -> dict | None:
+    from typing import Optional
+
+    def read_security_json(self) -> Optional[dict]:
         """Read the security.json file and check for any changes."""
         try:
             with open(self.json_file, 'r') as fh:
