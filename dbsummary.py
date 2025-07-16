@@ -913,12 +913,11 @@ class DBAnalyser:
             print()
 
         security_changes = SecurityCheck(rootdir).read_security_json()
-        if security_changes is not None:
-            if security_changes:
-                print()
-                print("Security Wizard Changes")
-                print(len("Security Wizard Changes") * "=")
-                [print(f"{k}: {security_changes[k]}") for k in sorted(security_changes.keys())]
+        if security_changes:
+            print()
+            print("Security Wizard Changes")
+            print(len("Security Wizard Changes") * "=")
+            [print(f"{k}: {security_changes[k]}") for k in sorted(security_changes.keys())]
 
             print()
 
