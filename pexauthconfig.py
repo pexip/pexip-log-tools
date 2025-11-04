@@ -74,7 +74,7 @@ class PexAuth:
         if self.version['version-id'] >= '35':
             self.permissions_oauth2client_table = self._build_dict(self.defaultdb, 'permissions_oauth2client', ('id', 'client_id', 'client_name', 'public_key_jwt', 'role_id'), 'id')
             self.permissions_oauth2token_table = self._build_dict_join(self.defaultdb, 'permissions_oauth2client', 'id', 'role_id', 'permissions_rolemapping', 'name')
-        if self.version['version-id'] >= '34':
+        if self.version['version-id'] >= '34' and self.version['version-id'] <= '38':
             self.permissions_oauth2tokens_table = self._build_dict(self.defaultdb, 'permissions_oauth2token', ('id', 'token_type', 'access_token', 'scope', 'issued_at', 'expires_at', 'client_id'), 'id')
 
 
@@ -192,46 +192,77 @@ class PexAuth:
             print('OpenID Connect configuration')
             print(len('OpenID Connect configuration') * '=')
             print()
-            print(f'Metadata URL: {auth_config["oidc_metadata_url"]}')
-            print(f'Authorize URL: {auth_config["oidc_authorize_url"]}')
-            print(f'Token endpoint URL: {auth_config["oidc_token_endpoint_url"]}')
-            print(f'Client ID: {auth_config["oidc_client_id"]}')
-            print(f'Authentication method: {auth_config["oidc_auth_method"]}')
-            print(f'Scope: {auth_config["oidc_scope"]}')
-            print(f'Username field: {auth_config["oidc_username_field"]}')
-            print(f'Groups field: {auth_config["oidc_groups_field"]}')
-            if auth_config["oidc_required_key"]:
+            if auth_config.get("oidc_metadata_url"):
+                print(f'Metadata URL: {auth_config["oidc_metadata_url"]}')
+            if auth_config.get("oidc_authorize_url"):
+                print(f'Authorize URL: {auth_config["oidc_authorize_url"]}')
+            if auth_config.get("oidc_token_endpoint_url"):
+                print(f'Token endpoint URL: {auth_config["oidc_token_endpoint_url"]}')
+            if auth_config.get("oidc_client_id"):
+                print(f'Client ID: {auth_config["oidc_client_id"]}')
+            if auth_config.get("oidc_auth_method"):
+                print(f'Authentication method: {auth_config["oidc_auth_method"]}')
+            if auth_config.get("oidc_scope"):
+                print(f'Scope: {auth_config["oidc_scope"]}')
+            if auth_config.get("oidc_username_field"):
+                print(f'Username field: {auth_config["oidc_username_field"]}')
+            if auth_config.get("oidc_groups_field"):
+                print(f'Groups field: {auth_config["oidc_groups_field"]}')
+            if auth_config.get("oidc_required_key"):
                 print(f'Required key: {auth_config["oidc_required_key"]}')
-            if auth_config["oidc_required_value"]:
+            if auth_config.get("oidc_required_value"):
                 print(f'Required value: {auth_config["oidc_required_value"]}')
             print()
             if metadata:
                 print('OpenID Connect metadata')
                 print(len('OpenID Connect metadata') * '=')
                 print()
-                print(f'Token endpoint: {metadata["token_endpoint"]}')
-                print(f'Token endpoint auth methods supported: {metadata["token_endpoint_auth_methods_supported"]}')
-                print(f'JWKS URI: {metadata["jwks_uri"]}')
-                print(f'Response modes supported: {metadata["response_modes_supported"]}')
-                print(f'Subject types supported: {metadata["subject_types_supported"]}')
-                print(f'ID token signing alg values supported: {metadata["id_token_signing_alg_values_supported"]}')
-                print(f'Response types supported: {metadata["response_types_supported"]}')
-                print(f'Supported scopes: {metadata["scopes_supported"]}')
-                print(f'Issuer: {metadata["issuer"]}')
-                print(f'Request URI parameter supported: {metadata["request_uri_parameter_supported"]}')
-                print(f'User info endpoint: {metadata["userinfo_endpoint"]}')
-                print(f'Authorization endpoint: {metadata["authorization_endpoint"]}')
-                print(f'Device authorization endpoint: {metadata["device_authorization_endpoint"]}')
-                print(f'HTTP logout supported: {metadata["http_logout_supported"]}')
-                print(f'Front channel logout supported: {metadata["frontchannel_logout_supported"]}')
-                print(f'End session endpoint: {metadata["end_session_endpoint"]}')
-                print(f'Claims supported: {metadata["claims_supported"]}')
-                print(f'Kerberos endpoint: {metadata["kerberos_endpoint"]}')
-                print(f'Tenant region scope: {metadata["tenant_region_scope"]}')
-                print(f'Cloud instance name: {metadata["cloud_instance_name"]}')
-                print(f'Cloud graph hostname: {metadata["cloud_graph_host_name"]}')
-                print(f'Microsoft Graph URI: {metadata["msgraph_host"]}')
-                print(f'RBAC URL: {metadata["rbac_url"]}')
+                if metadata.get("token_endpoint"):
+                    print(f'Token endpoint: {metadata["token_endpoint"]}')
+                if metadata.get("token_endpoint_auth_methods_supported"):
+                    print(f'Token endpoint auth methods supported: {metadata["token_endpoint_auth_methods_supported"]}')
+                if metadata.get("jwks_uri"):
+                    print(f'JWKS URI: {metadata["jwks_uri"]}')
+                if metadata.get("response_modes_supported"):
+                    print(f'Response modes supported: {metadata["response_modes_supported"]}')
+                if metadata.get("subject_types_supported"):
+                    print(f'Subject types supported: {metadata["subject_types_supported"]}')
+                if metadata.get("id_token_signing_alg_values_supported"):
+                    print(f'ID token signing alg values supported: {metadata["id_token_signing_alg_values_supported"]}')
+                if metadata.get("response_types_supported"):
+                    print(f'Response types supported: {metadata["response_types_supported"]}')
+                if metadata.get("scopes_supported"):
+                    print(f'Supported scopes: {metadata["scopes_supported"]}')
+                if metadata.get("issuer"):
+                    print(f'Issuer: {metadata["issuer"]}')
+                if metadata.get("request_uri_parameter_supported"):
+                    print(f'Request URI parameter supported: {metadata["request_uri_parameter_supported"]}')
+                if metadata.get("userinfo_endpoint"):
+                    print(f'User info endpoint: {metadata["userinfo_endpoint"]}')
+                if metadata.get("authorization_endpoint"):
+                    print(f'Authorization endpoint: {metadata["authorization_endpoint"]}')
+                if metadata.get("device_authorization_endpoint"):
+                    print(f'Device authorization endpoint: {metadata["device_authorization_endpoint"]}')
+                if metadata.get("http_logout_supported"):
+                    print(f'HTTP logout supported: {metadata["http_logout_supported"]}')
+                if metadata.get("frontchannel_logout_supported"):
+                    print(f'Front channel logout supported: {metadata["frontchannel_logout_supported"]}')
+                if metadata.get("end_session_endpoint"):
+                    print(f'End session endpoint: {metadata["end_session_endpoint"]}')
+                if metadata.get("claims_supported"):
+                    print(f'Claims supported: {metadata["claims_supported"]}')
+                if metadata.get("kerberos_endpoint"):
+                    print(f'Kerberos endpoint: {metadata["kerberos_endpoint"]}')
+                if metadata.get("tenant_region_scope"):
+                    print(f'Tenant region scope: {metadata["tenant_region_scope"]}')
+                if metadata.get("cloud_instance_name"):
+                    print(f'Cloud instance name: {metadata["cloud_instance_name"]}')
+                if metadata.get("cloud_graph_host_name"):
+                    print(f'Cloud graph hostname: {metadata["cloud_graph_host_name"]}')
+                if metadata.get("msgraph_host"):
+                    print(f'Microsoft Graph URI: {metadata["msgraph_host"]}')
+                if metadata.get("rbac_url"):
+                    print(f'RBAC URL: {metadata["rbac_url"]}')
                 print()
         if 'LDAP' in auth_config['source'] or 'OIDC' in auth_config['source']:
             role_mapping = self.authentication_role_mapping_table
@@ -278,7 +309,7 @@ class PexAuth:
                     print(f'    Administrator role: {self.permissions_oauth2token_table[item["id"]][0]}')
                     print(f'    Role mapping: {self.authentication_role_mapping_table[[item["role_id"]][0]]["value"] if item["role_id"] in self.authentication_role_mapping_table else "None"}')
                     print()
-        if self.version['version-id'] >= '34':
+        if self.version['version-id'] >= '34' and self.version['version-id'] <= '38':
             if self.permissions_oauth2tokens_table:
                 print('OAuth2 Tokens')
                 print(len('OAuth2 Tokens') * '=')
