@@ -27,7 +27,7 @@ sudo -v
 PEX_DIR=~/pexscripts
 
 # Pexip script array
-declare -a PEX_SCRIPTS=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexauthconfig.py" "pexidpconfig.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
+declare -a PEX_SCRIPTS=("confhistory.py" "connectivity.py" "dbsummary.py" "logreader.py" "pexauthconfig.py" "pexidpconfig.py" "pexpings.py" "pexsnap.py" "pexwebapps.py" "mjxsummary.py" "staticroutes.py" "sync_pexscripts.sh")
 
 # Enable debug output
 DEBUG=0

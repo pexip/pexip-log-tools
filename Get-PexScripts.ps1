@@ -32,6 +32,7 @@ $FilesToManage = @{
     "$downloadFolder\vmotion.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/vmotion.py"
     "$downloadFolder\pexauthconfig.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexauthconfig.py"
     "$downloadFolder\pexidpconfig.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexidpconfig.py"
+    "$downloadFolder\pexpings.py" = "https://raw.githubusercontent.com/pexip/pexip-log-tools/master/pexpings.py"
 }
 
 # Check to see if the backup folder exits

@@ -76,6 +76,7 @@ $MJXScript = "C:\Tools\Scripts\mjxsummary.py"
 $WebappScript = "C:\Tools\Scripts\pexwebapps.py"
 $IdPScript = "C:\Tools\Scripts\pexidpconfig.py"
 $AuthScript = "C:\Tools\Scripts\pexauthconfig.py"
+$PingScript = "C:\Tools\Scripts\pexpings.py"
 
 $OutputFolder = "C:\Tools\Scripts\Output\"
 $LogReaderError = "LogReaderError.txt"
@@ -86,6 +87,7 @@ $MJXError = "MJXError.txt"
 $WebappError = "WebappError.txt"
 $IdPError = "IdPError.txt"
 $AuthError = "AuthError.txt"
+$PingError = "PingError.txt"
 
 $SupportLog = "support.log"
 $DeveloperLog = "developer.log"
@@ -104,6 +106,7 @@ $RectorStallingText = "Pex_Health_Reactor_Stalling.txt"
 $WebappReport = "Pex_Report_WebappsSummary.txt"
 $IdPReport = "Pex_Report_IdPSummary.txt"
 $AuthReport = "Pex_Report_AuthConfigSummary.txt"
+$PingReport = "Pex_Report_IrregularPingSummary.txt"
 
 $env:PYTHONIOENCODING="UTF-8"
 $SnapArray = @()
@@ -943,9 +946,10 @@ else {
                 $ConfHistoryFile = New-PexSummary -Snapfolders $SnapFolder -ScriptFile $ConfHistoryScript -ReportFile $ConfHistoryReport -SummaryError $ConfHistoryError
                 New-PexSummary -Snapfolders $SnapFolder -ScriptFile $ConnectivityScript -ReportFile $ConnectivityReport -SummaryError $ConnectivityError | Out-Null
                 New-PexSummary -Snapfolders $SnapFolder -ScriptFile $MJXScript -ReportFile $MJXReport -SummaryError $MJXError | Out-Null
-		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
-  		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
-    		New-PexSummary -Snapfolders $SnapFolder -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
+                New-PexSummary -Snapfolders $SnapFolder -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
+                New-PexSummary -Snapfolders $SnapFolder -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
+                New-PexSummary -Snapfolders $SnapFolder -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
+                New-PexSummary -Snapfolders $SnapFolder -ScriptFile $PingScript -ReportFile $PingReport -SummaryError $PingError | Out-Null
             }
     
             else {
@@ -1028,10 +1032,10 @@ else {
                 $ConfHistoryFile = New-PexSummary -Snapfolders $_ -ScriptFile $ConfHistoryScript -ReportFile $ConfHistoryReport -SummaryError $ConfHistoryError
                 New-PexSummary -Snapfolders $_ -ScriptFile $ConnectivityScript -ReportFile $ConnectivityReport -SummaryError $ConnectivityError | Out-Null
                 New-PexSummary -Snapfolders $_ -ScriptFile $MJXScript -ReportFile $MJXReport -SummaryError $MJXError | Out-Null
-		New-PexSummary -Snapfolders $_ -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
-		New-PexSummary -Snapfolders $_ -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
-		New-PexSummary -Snapfolders $_ -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
-		
+		        New-PexSummary -Snapfolders $_ -ScriptFile $WebappScript -ReportFile $WebappReport -SummaryError $WebappError | Out-Null
+		        New-PexSummary -Snapfolders $_ -ScriptFile $IdPScript -ReportFile $IdPReport -SummaryError $IdPError | Out-Null
+		        New-PexSummary -Snapfolders $_ -ScriptFile $AuthScript -ReportFile $AuthReport -SummaryError $AuthError | Out-Null
+                New-PexSummary -Snapfolders $_ -ScriptFile $PingScript -ReportFile $PingReport -SummaryError $PingError | Out-Null
             }
             else {
                 $DBSummaryFile = $false

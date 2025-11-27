@@ -61,7 +61,6 @@ support = 'unified_support.log'
 usyslog = 'unified_syslog.log'
 
 irregularpulsetext = 'pex_health_irregular_pulse.log'
-irregularpingstext = 'pex_health_irregular_ping.log'
 rectorstallingtext = 'pex_health_reactor_stalling.log'
 numaconfigurattext = 'pex_health_numa_nodes.log'
 e1adapteresetstext = 'pex_health_adapter_resets.log'
@@ -113,6 +112,10 @@ external_scripts = {
     'mjx_summary': {
         'logfile':'pex_report_mjxsummary.log',
         'script':script_location+'/mjxsummary.py'
+    },
+    'irregular_ping': {
+        'logfile':'pex_health_irregular_ping.log',
+        'script':script_location+'/pexpings.py'
     },
     'vmotion': {
         'logfile':'pex_health_vmotionreport.log',
@@ -328,10 +331,6 @@ def main():
             print(' -- Checking for stability issues')
             if dev_files_array:
                 for line in fileinput.input(dev_files_array):
-                    matchip = re.compile(r'Irregular ping detected.+\(\d[1-9]+\.\d[0-9].+sec\)')
-                    if matchip.findall(line):
-                        with open(snapshot_output + parsedlogdir + irregularpingstext, 'a') as output_file:
-                            output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
                     if 'Reactor stalling' in line:
                         with open(snapshot_output + parsedlogdir + rectorstallingtext, 'a') as output_file:
                             output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
