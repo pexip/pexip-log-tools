@@ -54,6 +54,8 @@ def main(rootdir):
         irregularpulse_nodes = []
         irregularpulse_duration = []
         for line in fileinput.input(files):
+            if "worker_load_monitor" not in line and "Irregular ping detected" not in line and "Irregular pulse duration detected" not in line:
+                continue
             load_match = worker_load_capture.search(line)
             if load_match:
                 load_timestamps.append(load_match.group(1))
