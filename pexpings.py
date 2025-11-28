@@ -20,6 +20,7 @@ import fileinput
 import glob
 import os
 import re
+import statistics
 import sys
 
 def main(rootdir):
@@ -27,9 +28,9 @@ def main(rootdir):
     files = sorted(glob.glob(os.path.join(rootdir, 'var/log/unified_developer.log*')), key=os.path.getmtime, reverse=True)
 
     if files:
-        l_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+),\sAvg\ssystem\sidle:\s(\d+\.\d+),\sInstant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+)\]')
-        m_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
-        n_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
+        worker_load_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+),\sAvg\ssystem\sidle:\s(\d+\.\d+),\sInstant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+)\]')
+        irregular_ping_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
+        irregular_pulse_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
         load_nodes = []
         loads_media_cpu = []
         loads_avg_system_idle = []
@@ -45,26 +46,26 @@ def main(rootdir):
         irregularpulse_nodes = []
         irregularpulse_duration = []
         for line in fileinput.input(files):
-            l = l_capture.search(line)
-            if l:
-                load_nodes.append(l.group(2))
-                loads_media_cpu.append(float(l.group(3)))
-                loads_avg_system_idle.append(float(l.group(4)))
-                loads_instant_system_idle.append(float(l.group(5)))
-                loads_numa.append(float(l.group(6)))
-            m = m_capture.search(line)
-            if m:
+            load_match = worker_load_capture.search(line)
+            if load_match:
+                load_nodes.append(load_match.group(2))
+                loads_media_cpu.append(float(load_match.group(3)))
+                loads_avg_system_idle.append(float(load_match.group(4)))
+                loads_instant_system_idle.append(float(load_match.group(5)))
+                loads_numa.append(float(load_match.group(6)))
+            irregular_ping_match = irregular_ping_capture.search(line)
+            if irregular_ping_match:
                 irregularpings = True
-                irregularping_timestamps.append(m.group(1))
-                irregularping_nodes.append(m.group(2))
-                irregularping_duration.append(float(m.group(3)))
-                irregularping_process.append(m.group(4))
-            n = n_capture.search(line)
-            if n:
+                irregularping_timestamps.append(irregular_ping_match.group(1))
+                irregularping_nodes.append(irregular_ping_match.group(2))
+                irregularping_duration.append(float(irregular_ping_match.group(3)))
+                irregularping_process.append(irregular_ping_match.group(4))
+            irregular_pulse_match = irregular_pulse_capture.search(line)
+            if irregular_pulse_match:
                 irregularpulse = True
-                irregularpulse_timestamps.append(n.group(1))
-                irregularpulse_nodes.append(n.group(2))
-                irregularpulse_duration.append(float(n.group(3)))
+                irregularpulse_timestamps.append(irregular_pulse_match.group(1))
+                irregularpulse_nodes.append(irregular_pulse_match.group(2))
+                irregularpulse_duration.append(float(irregular_pulse_match.group(3)))
         if not irregularpulse and not irregularpings:
             return
         print('Stall detection report')
@@ -99,16 +100,16 @@ def main(rootdir):
                 numa_vals = [loads_numa[i] for i in indices]
                 min_cpu = min(media_cpu_vals)
                 max_cpu = max(media_cpu_vals)
-                avg_cpu = sum(media_cpu_vals) / len(media_cpu_vals)
+                avg_cpu = statistics.mean(media_cpu_vals)
                 min_avg_idle = min(avg_sys_idle_vals)
                 max_avg_idle = max(avg_sys_idle_vals)
-                avg_avg_idle = sum(avg_sys_idle_vals) / len(avg_sys_idle_vals)
+                avg_avg_idle = statistics.mean(avg_sys_idle_vals)
                 min_inst_idle = min(inst_sys_idle_vals)
                 max_inst_idle = max(inst_sys_idle_vals)
-                avg_inst_idle = sum(inst_sys_idle_vals) / len(inst_sys_idle_vals)
+                avg_inst_idle = statistics.mean(inst_sys_idle_vals)
                 min_numa = min(numa_vals)
                 max_numa = max(numa_vals)
-                avg_numa = sum(numa_vals) / len(numa_vals)
+                avg_numa = statistics.mean(numa_vals)
                 node_stats.append((
                     node,
                     (min_cpu, max_cpu, avg_cpu),
@@ -141,7 +142,7 @@ def main(rootdir):
                 durations = [irregularpulse_duration[i] for i in range(len(irregularpulse_nodes)) if irregularpulse_nodes[i] == node]
                 max_duration = max(durations)
                 min_duration = min(durations)
-                average_duration = sum(durations) / total_pulses
+                average_duration = statistics.mean(durations)
                 node_stats.append((node, total_pulses, max_duration, min_duration, average_duration))
             # Sort by total_pulses descending
             node_stats.sort(key=lambda x: x[1], reverse=True)
@@ -173,7 +174,7 @@ def main(rootdir):
                 durations = [irregularping_duration[i] for i in range(len(irregularping_nodes)) if irregularping_nodes[i] == node]
                 max_duration = max(durations)
                 min_duration = min(durations)
-                average_duration = sum(durations) / total_pings
+                average_duration = statistics.mean(durations)
                 node_stats.append((node, total_pings, max_duration, min_duration, average_duration))
             # Sort by total_pings descending
             node_stats.sort(key=lambda x: x[1], reverse=True)
