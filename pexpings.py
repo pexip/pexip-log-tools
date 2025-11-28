@@ -23,19 +23,27 @@ import re
 import statistics
 import sys
 
+idle_threshold: float = 0.38
+
 def main(rootdir):
 
     files = sorted(glob.glob(os.path.join(rootdir, 'var/log/unified_developer.log*')), key=os.path.getmtime, reverse=True)
 
     if files:
-        worker_load_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+),\sAvg\ssystem\sidle:\s(\d+\.\d+),\sInstant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+)\]')
-        irregular_ping_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
-        irregular_pulse_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
+        worker_load_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+).+Instant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+(,\s\d+\.\d+)?)\]')
+        irregular_ping_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
+        irregular_pulse_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
+        multiple_numa_detected = False
+        multiple_numa_nodes = []
+        load_timestamps = []
         load_nodes = []
         loads_media_cpu = []
-        loads_avg_system_idle = []
+        #loads_avg_system_idle = []
         loads_instant_system_idle = []
         loads_numa = []
+        load_below_threshold_timestamps = []
+        load_below_threshold_nodes = []
+        load_below_threshold_values = []
         irregularpings = False
         irregularping_timestamps = []
         irregularping_nodes = []
@@ -48,11 +56,24 @@ def main(rootdir):
         for line in fileinput.input(files):
             load_match = worker_load_capture.search(line)
             if load_match:
+                load_timestamps.append(load_match.group(1))
                 load_nodes.append(load_match.group(2))
                 loads_media_cpu.append(float(load_match.group(3)))
-                loads_avg_system_idle.append(float(load_match.group(4)))
-                loads_instant_system_idle.append(float(load_match.group(5)))
-                loads_numa.append(float(load_match.group(6)))
+                node_instant_system_idle = float(load_match.group(4))
+                loads_instant_system_idle.append(node_instant_system_idle)
+                try:
+                    loads_numa.append(float(load_match.group(5)))
+                except ValueError:
+                    # Multiple NUMA values, take average and flag
+                    numa_values = [float(x) for x in load_match.group(5).split(', ')]
+                    loads_numa.append(statistics.mean(numa_values))
+                    multiple_numa_detected = True
+                    multiple_numa_nodes.append(load_match.group(2))
+                # Check for instant system idle below threshold
+                if node_instant_system_idle < float(idle_threshold):
+                    load_below_threshold_timestamps.append(load_match.group(1))
+                    load_below_threshold_nodes.append(load_match.group(2))
+                    load_below_threshold_values.append(node_instant_system_idle)
             irregular_ping_match = irregular_ping_capture.search(line)
             if irregular_ping_match:
                 irregularpings = True
@@ -66,72 +87,91 @@ def main(rootdir):
                 irregularpulse_timestamps.append(irregular_pulse_match.group(1))
                 irregularpulse_nodes.append(irregular_pulse_match.group(2))
                 irregularpulse_duration.append(float(irregular_pulse_match.group(3)))
-        if not irregularpulse and not irregularpings:
-            return
-        print('Stall detection report')
-        print('=====================')
+        print('Stall report')
+        print(len('Stall report') * '=')
         print()
+        print('Irregular pulse entries: %d' % (len(irregularpulse_nodes)))
+        print('Irregular ping entries: %d' % (len(irregularping_nodes)))
         print('Worker load monitor entries processed: %d' % (len(load_nodes)))
-        print('Irregular pulse entries detected: %d' % (len(irregularpulse_nodes)))
-        print('Irregular ping entries detected: %d' % (len(irregularping_nodes)))
+        print()
+        if multiple_numa_detected:
+            print('!!! Multiple NUMA node values detected; averages were used. !!!')
+            print('Affected nodes: %s' % (", ".join(set(multiple_numa_nodes))))
         print()
         if load_nodes:
             print('{:<20}{:<25}{:<25}{:<25}{}'.format(
                 'Node',
                 'Media CPU load',
-                'Avg system idle',
+                'NUMA',
                 'Instant system idle',
-                'NUMA'
+                'Instant idle timestamp (min)'
             ))
             print('{:<20}{:<25}{:<25}{:<25}{}'.format(
                 '',
                 '(min/max/avg)',
                 '(min/max/avg)',
                 '(min/max/avg)',
-                '(min/max/avg)'
+                ''
             ))
             print('-------------------------------------------------------------------------------------------------------------')
             node_stats = []
             for node in set(load_nodes):
                 indices = [i for i in range(len(load_nodes)) if load_nodes[i] == node]
                 media_cpu_vals = [loads_media_cpu[i] for i in indices]
-                avg_sys_idle_vals = [loads_avg_system_idle[i] for i in indices]
+                #avg_sys_idle_vals = [loads_avg_system_idle[i] for i in indices]
                 inst_sys_idle_vals = [loads_instant_system_idle[i] for i in indices]
                 numa_vals = [loads_numa[i] for i in indices]
                 min_cpu = min(media_cpu_vals)
                 max_cpu = max(media_cpu_vals)
                 avg_cpu = statistics.mean(media_cpu_vals)
-                min_avg_idle = min(avg_sys_idle_vals)
-                max_avg_idle = max(avg_sys_idle_vals)
-                avg_avg_idle = statistics.mean(avg_sys_idle_vals)
+                # min_avg_idle = min(avg_sys_idle_vals)
+                # max_avg_idle = max(avg_sys_idle_vals)
+                # avg_avg_idle = statistics.mean(avg_sys_idle_vals)
                 min_inst_idle = min(inst_sys_idle_vals)
                 max_inst_idle = max(inst_sys_idle_vals)
                 avg_inst_idle = statistics.mean(inst_sys_idle_vals)
                 min_numa = min(numa_vals)
                 max_numa = max(numa_vals)
                 avg_numa = statistics.mean(numa_vals)
+                node_timestamps = [load_timestamps[i] for i in indices]
+                min_inst_idle_index = inst_sys_idle_vals.index(min_inst_idle)
+                min_inst_idle_timestamp = node_timestamps[min_inst_idle_index]
                 node_stats.append((
                     node,
                     (min_cpu, max_cpu, avg_cpu),
-                    (min_avg_idle, max_avg_idle, avg_avg_idle),
+                    (min_numa, max_numa, avg_numa),
+                    #(min_avg_idle, max_avg_idle, avg_avg_idle),
                     (min_inst_idle, max_inst_idle, avg_inst_idle),
-                    (min_numa, max_numa, avg_numa)
+                    min_inst_idle_timestamp
                 ))
             # Sort by avg_cpu descending
             node_stats.sort(key=lambda x: x[1][2], reverse=True)
-            for node, cpu_vals, avg_idle_vals, inst_idle_vals, numa_vals in node_stats:
-                print('{:<20}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:.2f}'.format(
+            for node, cpu_vals, numa_vals, inst_idle_vals, min_inst_idle_timestamp in node_stats:
+                print('{:<20}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{}'.format(
                     node,
                     cpu_vals[0], cpu_vals[1], cpu_vals[2],
-                    avg_idle_vals[0], avg_idle_vals[1], avg_idle_vals[2],
+                    numa_vals[0], numa_vals[1], numa_vals[2],
                     inst_idle_vals[0], inst_idle_vals[1], inst_idle_vals[2],
-                    numa_vals[0], numa_vals[1], numa_vals[2]
+                    min_inst_idle_timestamp
                 ))
+            print()
+        if load_below_threshold_nodes:
+            print('Nodes with instant system idle below %.2f:' % (idle_threshold))
+            print('{:<30}{:<20}{:<25}'.format('Timestamp', 'Node', 'Idle Value'))
+            print('--------------------------------------------------------------')
+            # Sort entries by timestamp ascending
+            entries = list(zip(load_below_threshold_timestamps, load_below_threshold_nodes, load_below_threshold_values))
+            entries.sort(key=lambda x: x[0], reverse=False)
+            for timestamp, node, value in entries:
+                print('{:<30}{:<20}{:<25.2f}'.format(timestamp, node, value))
             print()
         if irregularpulse:
             # Table header
-            print('Summary irregular pulse entries')
             print()
+            print('Irregular pulse')
+            print(len('Irregular pulse') * '=')
+            print()
+            print('Summary of irregular pulses found')
             print('{:<20}{:<15}{:<20}{:<20}{:<20}'.format(
                 'Node', 'Total Pulses', 'Min Duration (sec)', 'Max Duration (sec)', 'Average Duration (sec)'
             ))
@@ -151,7 +191,8 @@ def main(rootdir):
                     node, total_pulses, min_duration, max_duration, average_duration
                 ))
             print()
-            print('Detailed irregular pulse entries\n')
+            print()
+            print('Details of irregular pulses found')
             print('{:<30}{:<20}{:<16}'.format('Timestamp', 'Node', 'Duration (sec)'))
             print('----------------------------------------------------------------')
             # Sort entries by timestamp ascending
@@ -162,8 +203,11 @@ def main(rootdir):
             print()
         if irregularpings:
             # Table header
-            print('Summary irregular ping entries')
             print()
+            print('Irregular pings')
+            print(len('Irregular pings') * '=')
+            print()
+            print('Summary of irregular pings found')
             print('{:<20}{:<15}{:<20}{:<20}{:<20}'.format(
                 'Node', 'Total Pings', 'Min Duration (sec)', 'Max Duration (sec)', 'Average Duration (sec)'
             ))
@@ -183,7 +227,8 @@ def main(rootdir):
                     node, total_pings, min_duration, max_duration, average_duration
                 ))
             print()
-            print('Detailed irregular ping entries\n')
+            print()
+            print('Details of irregular pings found')
             print('{:<30}{:<20}{:<16}{:<15}'.format('Timestamp', 'Node', 'Duration (sec)', 'Process'))
             print('-------------------------------------------------------------------------')
             # Sort entries by timestamp ascending
