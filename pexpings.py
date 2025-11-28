@@ -27,31 +27,76 @@ def main(rootdir):
     files = sorted(glob.glob(os.path.join(rootdir, 'var/log/unified_developer.log*')), key=os.path.getmtime, reverse=True)
 
     if files:
-        capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
+        m_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
+        n_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
         irregularpings = False
         irregularping_timestamps = []
         irregularping_nodes = []
         irregularping_duration = []
         irregularping_process = []
+        irregularpulse = False
+        irregularpulse_timestamps = []
+        irregularpulse_nodes = []
+        irregularpulse_duration = []
         for line in fileinput.input(files):
-            m = capture.search(line)
+            m = m_capture.search(line)
             if m:
                 irregularpings = True
                 irregularping_timestamps.append(m.group(1))
                 irregularping_nodes.append(m.group(2))
                 irregularping_duration.append(float(m.group(3)))
                 irregularping_process.append(m.group(4))
-        if irregularpings:
-            print('Irregular ping report')
-            print('=====================')
+            n = n_capture.search(line)
+            if n:
+                irregularpulse = True
+                irregularpulse_timestamps.append(n.group(1))
+                irregularpulse_nodes.append(n.group(2))
+                irregularpulse_duration.append(float(n.group(3)))
+        if not irregularpulse and not irregularpings:
+            return
+        print('Stall detection report')
+        print('=====================')
+        print()
+        if irregularpulse:
+            # Table header
+            print('Summary irregular pulse entries')
             print()
+            print('{:<20}{:<15}{:<20}{:<20}{:<20}'.format(
+                'Node', 'Total Pulses', 'Min Duration (sec)', 'Max Duration (sec)', 'Average Duration (sec)'
+            ))
+            print('-------------------------------------------------------------------------------------------------')
+            node_stats = []
+            for node in set(irregularpulse_nodes):
+                total_pulses = irregularpulse_nodes.count(node)
+                durations = [irregularpulse_duration[i] for i in range(len(irregularpulse_nodes)) if irregularpulse_nodes[i] == node]
+                max_duration = max(durations)
+                min_duration = min(durations)
+                average_duration = sum(durations) / total_pulses
+                node_stats.append((node, total_pulses, max_duration, min_duration, average_duration))
+            # Sort by total_pulses descending
+            node_stats.sort(key=lambda x: x[1], reverse=True)
+            for node, total_pulses, max_duration, min_duration, average_duration in node_stats:
+                print('{:<20}{:<15}{:<20.6f}{:<20.6f}{:<20.6f}'.format(
+                    node, total_pulses, min_duration, max_duration, average_duration
+                ))
+            print()
+            print('Detailed irregular pulse entries\n')
+            print('{:<30}{:<20}{:<16}'.format('Timestamp', 'Node', 'Duration (sec)'))
+            print('----------------------------------------------------------------')
+            # Sort entries by timestamp ascending
+            entries = list(zip(irregularpulse_timestamps, irregularpulse_nodes, irregularpulse_duration))
+            entries.sort(key=lambda x: x[0], reverse=False)
+            for timestamp, node, duration in entries:
+                print('{:<30}{:<20}{:<16.6f}'.format(timestamp, node, duration))
+            print()
+        if irregularpings:
             # Table header
             print('Summary irregular ping entries')
             print()
-            print('{:<10}{:<15}{:<20}{:<20}{:<20}'.format(
+            print('{:<20}{:<15}{:<20}{:<20}{:<20}'.format(
                 'Node', 'Total Pings', 'Min Duration (sec)', 'Max Duration (sec)', 'Average Duration (sec)'
             ))
-            print('-------------------------------------------------------------------------------')
+            print('-------------------------------------------------------------------------------------------------')
             node_stats = []
             for node in set(irregularping_nodes):
                 total_pings = irregularping_nodes.count(node)
@@ -63,18 +108,18 @@ def main(rootdir):
             # Sort by total_pings descending
             node_stats.sort(key=lambda x: x[1], reverse=True)
             for node, total_pings, max_duration, min_duration, average_duration in node_stats:
-                print('{:<10}{:<15}{:<20.6f}{:<20.6f}{:<20.6f}'.format(
+                print('{:<20}{:<15}{:<20.6f}{:<20.6f}{:<20.6f}'.format(
                     node, total_pings, min_duration, max_duration, average_duration
                 ))
             print()
             print('Detailed irregular ping entries\n')
-            print('{:<30}{:<10}{:<16}{:<15}'.format('Timestamp', 'Node', 'Duration (sec)', 'Process'))
-            print('---------------------------------------------------------------')
+            print('{:<30}{:<20}{:<16}{:<15}'.format('Timestamp', 'Node', 'Duration (sec)', 'Process'))
+            print('-------------------------------------------------------------------------')
             # Sort entries by timestamp ascending
             entries = list(zip(irregularping_timestamps, irregularping_nodes, irregularping_duration, irregularping_process))
             entries.sort(key=lambda x: x[0], reverse=False)
             for timestamp, node, duration, process in entries:
-                print('{:<30}{:<10}{:<16.6f}{:<15}'.format(timestamp, node, duration, process))
+                print('{:<30}{:<20}{:<16.6f}{:<15}'.format(timestamp, node, duration, process))
             print()
 
 if __name__ == "__main__":

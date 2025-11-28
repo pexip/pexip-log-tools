@@ -60,7 +60,6 @@ develop = 'unified_developer.log'
 support = 'unified_support.log'
 usyslog = 'unified_syslog.log'
 
-irregularpulsetext = 'pex_health_irregular_pulse.log'
 rectorstallingtext = 'pex_health_reactor_stalling.log'
 numaconfigurattext = 'pex_health_numa_nodes.log'
 e1adapteresetstext = 'pex_health_adapter_resets.log'
@@ -336,11 +335,6 @@ def main():
                             output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
                     if 'Multiple numa nodes detected during sampling' in line:
                         with open(snapshot_output + parsedlogdir + numaconfigurattext, 'a') as output_file:
-                            output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
-            if sup_files_array:
-                for line in fileinput.input(sup_files_array):
-                    if 'Irregular pulse duration detected' in line:
-                        with open(snapshot_output + parsedlogdir + irregularpulsetext, 'a') as output_file:
                             output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
             if sys_files_array:
                 for line in fileinput.input(sys_files_array):
