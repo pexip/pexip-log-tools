@@ -23,14 +23,14 @@ import re
 import statistics
 import sys
 
-idle_threshold = 0.38
+idle_threshold: float = 0.38
 
 def main(rootdir):
 
     files = sorted(glob.glob(os.path.join(rootdir, 'var/log/unified_developer.log*')), key=os.path.getmtime, reverse=True)
 
     if files:
-        worker_load_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+),\sAvg\ssystem\sidle:\s(\d+\.\d+),\sInstant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+(,\s\d+\.\d+)?)\]')
+        worker_load_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+).+Instant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+(,\s\d+\.\d+)?)\]')
         irregular_ping_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
         irregular_pulse_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s([\w.\-_]+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
         multiple_numa_detected = False
@@ -59,21 +59,21 @@ def main(rootdir):
                 load_timestamps.append(load_match.group(1))
                 load_nodes.append(load_match.group(2))
                 loads_media_cpu.append(float(load_match.group(3)))
-                #loads_avg_system_idle.append(float(load_match.group(4)))
-                loads_instant_system_idle.append(float(load_match.group(5)))
+                node_instant_system_idle = float(load_match.group(4))
+                loads_instant_system_idle.append(node_instant_system_idle)
                 try:
-                    loads_numa.append(float(load_match.group(6)))
+                    loads_numa.append(float(load_match.group(5)))
                 except ValueError:
                     # Multiple NUMA values, take average and flag
-                    numa_values = [float(x) for x in load_match.group(6).split(', ')]
+                    numa_values = [float(x) for x in load_match.group(5).split(', ')]
                     loads_numa.append(statistics.mean(numa_values))
                     multiple_numa_detected = True
                     multiple_numa_nodes.append(load_match.group(2))
                 # Check for instant system idle below threshold
-                if float(load_match.group(5)) < float(idle_threshold):
+                if node_instant_system_idle < float(idle_threshold):
                     load_below_threshold_timestamps.append(load_match.group(1))
                     load_below_threshold_nodes.append(load_match.group(2))
-                    load_below_threshold_values.append(float(load_match.group(5)))
+                    load_below_threshold_values.append(node_instant_system_idle)
             irregular_ping_match = irregular_ping_capture.search(line)
             if irregular_ping_match:
                 irregularpings = True
