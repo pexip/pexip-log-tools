@@ -27,8 +27,14 @@ def main(rootdir):
     files = sorted(glob.glob(os.path.join(rootdir, 'var/log/unified_developer.log*')), key=os.path.getmtime, reverse=True)
 
     if files:
+        l_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"worker_load_monitor".+Media\sCPU\sload:\s(\d+\.\d+),\sAvg\ssystem\sidle:\s(\d+\.\d+),\sInstant\ssystem\sidle:\s(\d+\.\d+),\sNUMA:\s\[(\d+\.\d+)\]')
         m_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+Irregular ping detected\s\((\d+\.\d+)\ssec\)\sin\s(\w+)\sprocess')
         n_capture = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+\.\d+\+\d+:\d+)\s(\w+).+"Irregular pulse duration detected"\sDuration="(\d+\.\d+)"')
+        load_nodes = []
+        loads_media_cpu = []
+        loads_avg_system_idle = []
+        loads_instant_system_idle = []
+        loads_numa = []
         irregularpings = False
         irregularping_timestamps = []
         irregularping_nodes = []
@@ -39,6 +45,13 @@ def main(rootdir):
         irregularpulse_nodes = []
         irregularpulse_duration = []
         for line in fileinput.input(files):
+            l = l_capture.search(line)
+            if l:
+                load_nodes.append(l.group(2))
+                loads_media_cpu.append(float(l.group(3)))
+                loads_avg_system_idle.append(float(l.group(4)))
+                loads_instant_system_idle.append(float(l.group(5)))
+                loads_numa.append(float(l.group(6)))
             m = m_capture.search(line)
             if m:
                 irregularpings = True
@@ -57,6 +70,63 @@ def main(rootdir):
         print('Stall detection report')
         print('=====================')
         print()
+        print('Worker load monitor entries processed: %d' % (len(load_nodes)))
+        print('Irregular pulse entries detected: %d' % (len(irregularpulse_nodes)))
+        print('Irregular ping entries detected: %d' % (len(irregularping_nodes)))
+        print()
+        if load_nodes:
+            print('{:<20}{:<25}{:<25}{:<25}{}'.format(
+                'Node',
+                'Media CPU load',
+                'Avg system idle',
+                'Instant system idle',
+                'NUMA'
+            ))
+            print('{:<20}{:<25}{:<25}{:<25}{}'.format(
+                '',
+                '(min/max/avg)',
+                '(min/max/avg)',
+                '(min/max/avg)',
+                '(min/max/avg)'
+            ))
+            print('-------------------------------------------------------------------------------------------------------------')
+            node_stats = []
+            for node in set(load_nodes):
+                indices = [i for i in range(len(load_nodes)) if load_nodes[i] == node]
+                media_cpu_vals = [loads_media_cpu[i] for i in indices]
+                avg_sys_idle_vals = [loads_avg_system_idle[i] for i in indices]
+                inst_sys_idle_vals = [loads_instant_system_idle[i] for i in indices]
+                numa_vals = [loads_numa[i] for i in indices]
+                min_cpu = min(media_cpu_vals)
+                max_cpu = max(media_cpu_vals)
+                avg_cpu = sum(media_cpu_vals) / len(media_cpu_vals)
+                min_avg_idle = min(avg_sys_idle_vals)
+                max_avg_idle = max(avg_sys_idle_vals)
+                avg_avg_idle = sum(avg_sys_idle_vals) / len(avg_sys_idle_vals)
+                min_inst_idle = min(inst_sys_idle_vals)
+                max_inst_idle = max(inst_sys_idle_vals)
+                avg_inst_idle = sum(inst_sys_idle_vals) / len(inst_sys_idle_vals)
+                min_numa = min(numa_vals)
+                max_numa = max(numa_vals)
+                avg_numa = sum(numa_vals) / len(numa_vals)
+                node_stats.append((
+                    node,
+                    (min_cpu, max_cpu, avg_cpu),
+                    (min_avg_idle, max_avg_idle, avg_avg_idle),
+                    (min_inst_idle, max_inst_idle, avg_inst_idle),
+                    (min_numa, max_numa, avg_numa)
+                ))
+            # Sort by avg_cpu descending
+            node_stats.sort(key=lambda x: x[1][2], reverse=True)
+            for node, cpu_vals, avg_idle_vals, inst_idle_vals, numa_vals in node_stats:
+                print('{:<20}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:<15.2f}{:.2f}/{:.2f}/{:.2f}'.format(
+                    node,
+                    cpu_vals[0], cpu_vals[1], cpu_vals[2],
+                    avg_idle_vals[0], avg_idle_vals[1], avg_idle_vals[2],
+                    inst_idle_vals[0], inst_idle_vals[1], inst_idle_vals[2],
+                    numa_vals[0], numa_vals[1], numa_vals[2]
+                ))
+            print()
         if irregularpulse:
             # Table header
             print('Summary irregular pulse entries')
