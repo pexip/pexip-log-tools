@@ -546,7 +546,7 @@ function Convert-PexLogs {
         }
         else {
             # Setup parsing for log files
-            $GrepWinArgumentList = """/searchpath:""$CurrentLogFolder\$ParsedLogDir"" /k:no /u:no /size:-1 /searchfor:""\^M"" /regex:yes /replacewith:""\r\n"" /filemaskregex:"".*dev.*|.*oss.*|.*support.*"" /executeReplace /closedialog"
+            $GrepWinArgumentList = """/searchpath:""$CurrentLogFolder\$ParsedLogDir"" /k:no /u:no /utf8:no /size:-1 /searchfor:""\^M"" /regex:yes /replacewith:""\r\n"" /filemaskregex:"".*dev.*|.*oss.*|.*support.*"" /executeReplace /closedialog"
 
             # Parse those files via grepwin in order to expand the log files.
             Write-Verbose "Convert-PexLog - Running Support Logs through GrepWin to Expand."
@@ -1056,3 +1056,4 @@ else {
     }
 }
 Pause
+
