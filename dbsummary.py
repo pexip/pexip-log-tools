@@ -1087,6 +1087,19 @@ class DBAnalyser:
                     'Expiry': cert.not_valid_after_utc,
                     'Signature': cert.signature_algorithm_oid._name.encode(),
                     'Hosts': [fqdn] }
+            # extract enhanced key usage
+            try:
+                ext = cert.extensions.get_extension_for_oid(x509.ExtensionOID.EXTENDED_KEY_USAGE)
+                usages = []
+                for usage in ext.value:
+                    if usage.dotted_string == "1.3.6.1.5.5.7.3.1":
+                        usages.append("serverAuth")
+                    elif usage.dotted_string == "1.3.6.1.5.5.7.3.2":
+                        usages.append("clientAuth")
+                if usages:
+                    data['EKU'] = ', '.join(usages)
+            except x509.ExtensionNotFound:
+                pass
 
             san = []
             for ext in cert.extensions:
@@ -1121,6 +1134,8 @@ class DBAnalyser:
             print(" Signature: %s" % cert['Signature'].decode())
             if cert.get('SANs'):
                 print("      SANs: %s" % cert['SANs'])
+            if cert.get('EKU'):
+                print("       EKU: %s" % cert['EKU'])
             print(" => %s" % '\n    '.join(cert['Hosts']))
             print()
 
