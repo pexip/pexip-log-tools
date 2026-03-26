@@ -538,9 +538,7 @@ class DBAnalyser:
                     blob[loc['name']]['client_turn_server'] = platform_client_turnservers[location_id]
 
             header = ['Name', 'IP Address', 'SIP TLS FQDN', 'Static NAT', 'Last Contacted', 'Version', 'Type']
-            if platform_global.get('allow_1080p'):
-                header.append('FHD')
-            header.extend(['HD', 'SD', 'Audio', 'CPU', 'Cores', 'RAM', 'Hypervisor', 'Boot Time', ''])
+            header.extend(['FHD', 'HD', 'SD', 'Audio', 'CPU', 'Cores', 'RAM', 'Hypervisor', 'Boot Time', ''])
             workers = [header]
             worker_data = []
             for worker_id in sorted(platform_workervm.keys(), key=lambda k: platform_workervm[k]['name']):
@@ -561,9 +559,7 @@ class DBAnalyser:
                 data = [worker['hostname'], worker['address'], worker['alternative_fqdn'], 
                         worker['static_nat_address'] if worker['static_nat_address'] and not worker['secondary_address'] else '', 
                         last_reported, status['version'], node_type]
-                if platform_global.get('allow_1080p'):
-                    data.append(status['max_full_hd_calls'])
-                data.extend([status['max_hd_calls'], status['max_sd_calls'], status['max_audio_calls']])
+                data.extend([status['max_full_hd_calls'], status['max_hd_calls'], status['max_sd_calls'], status['max_audio_calls']])
                 if status['cpu_model']:
                     if status['cpu_model'].startswith('Intel(R) Xeon(R) CPU '):
                         status['cpu_model'] = status['cpu_model'][21:]
@@ -854,7 +850,7 @@ class DBAnalyser:
             print("None")
             print()
 
-        gatewayrules = self._builddict(self.configuration, 'conferencing_gatewayroutingrule', ('name', 'match_string', 'replace_string', 'match_incoming_sip', 'match_incoming_h323', 'match_incoming_webrtc', 'match_incoming_mssip', 'match_incoming_calls', 'match_outgoing_calls', 'match_incoming_only_if_registered', 'match_string_full', 'outgoing_protocol', 'enable', 'called_device_type', 'match_source_location_id', 'outgoing_location_id', 'mssip_proxy_id', 'sip_proxy_id', 'h323_gatekeeper_id', 'teams_proxy_id'), 'priority')
+        gatewayrules = self._builddict(self.configuration, 'conferencing_gatewayroutingrule', ('name', 'match_string', 'replace_string', 'match_incoming_sip', 'match_incoming_h323', 'match_incoming_webrtc', 'match_incoming_mssip', 'match_incoming_teams', 'match_incoming_calls', 'match_outgoing_calls', 'match_incoming_only_if_registered', 'match_string_full', 'outgoing_protocol', 'enable', 'called_device_type', 'match_source_location_id', 'outgoing_location_id', 'mssip_proxy_id', 'sip_proxy_id', 'h323_gatekeeper_id', 'teams_proxy_id'), 'priority')
         print("Gateway Rules")
         print("=============")
         if len(gatewayrules.keys()) == 0:
@@ -872,6 +868,8 @@ class DBAnalyser:
                     protos.append("WebRTC")
                 if rule['match_incoming_mssip']:
                     protos.append("MSSIP")
+                if rule['match_incoming_teams']:
+                    protos.append("TEAMS")
                 if rule['match_incoming_only_if_registered']:
                     protos.append("Registered only")
             if rule['match_outgoing_calls']:

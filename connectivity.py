@@ -115,7 +115,7 @@ def main():
                 subkey = "%s [%s] -> %s [%s]" % (names.get(fields["Node"]), locations.get(fields["Node"]), names.get(fields["Src-Node"]), locations.get(fields["Src-Node"]))
             else:
                 subkey = "%s -> %s" % (locations.get(fields["Node"]), locations.get(fields["Src-Node"]))
-            print(fields["Last-Reported"], key, datetime.strptime(tts[:19], "%Y-%m-%d %H:%M:%S") - start, subkey)
+            print(fields["Last-Reported"], tts[:19], key, datetime.strptime(tts[:19], "%Y-%m-%d %H:%M:%S") - start, subkey)
             if key in data:
                 del data[key]
 

@@ -120,7 +120,7 @@ class ConfHistory:
                 print("Remote Address: %s" % row['remote_address'])
                 print("Start: %s / STILL CONNECTED" % connect_ts)
             else:
-                print("%s <%s> (%s) / %s" % (row['display_name'], row['remote_alias'], row['protocol'], row['role']))
+                print("%s <%s> (%s) / %s" % (row['display_name'], row.get('remote_alias', ''), row['protocol'], row['role']))
                 print("Call-ID: %s" % row['call_uuid'])
                 print("Participant-ID: %s" % row['id'])
                 print("Remote Address: %s" % row['remote_address'])
@@ -128,7 +128,7 @@ class ConfHistory:
                     print("Start: %s / End: %s / Duration: %s" % (start_ts, end_ts, (datetime.strptime(end_ts, "%Y-%m-%d %H:%M:%S") - datetime.strptime(start_ts, "%Y-%m-%d %H:%M:%S"))))
                 else:
                     print("FAILED CALL / End: %s" % end_ts)
-                print("Disconnect Reason: %s" % row['disconnect_reason'])
+                print("Disconnect Reason: %s" % row.get('disconnect_reason', ''))
 
             if row.get("external_node_id"):
                 print("External-Node-ID: %s" % row['external_node_id'])
