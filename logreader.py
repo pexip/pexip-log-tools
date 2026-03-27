@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """logreader: pass list of unified_support logs as a parameter."""
 
-# Copyright 2026 Pexip AS
+# Copyright 2025 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
