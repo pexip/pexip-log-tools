@@ -18,4 +18,4 @@ Pexip log processing tools, for processing logs and databases into easy-to-read 
  * `teamsload.py` - Processes history databases from a diagnostic snapshot if Teams Connector Enhanced Status is enabled ( Azure Event Hub )  and generates a utilization report of Teams Connector instances
  * `vmotion.py` - Processes the snapshot and generates a report if evidence of VMware vMotion use was found.
 
-Check the `SHA256SUMS` file to verify the integrity and authenticity of the files in this repo
+Check the SHA256SUMS file to verify the integrity and authenticity of the files in this repo
