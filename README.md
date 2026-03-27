@@ -10,6 +10,7 @@ Pexip log processing tools, for processing logs and databases into easy-to-read 
  * `Pexip_Log_Tools.ps1` - Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports.
  * `pexauthconfig.py` - Processes authentication database from a diagnostic snapshot into summary of authentication config
  * `pexidpconfig.py` - Processes configuration database from a diagnostic snapshot into summary of Identity Provider config
+ * `pexpings.py` - Checks files in a snapshot for irregular pings
  * `pexsnap.py` - Processes an entire diagnostic snapshot and automatically generates dbsummary, confhistory, connectivity, mjxsummary and logreader reports (OSX).
  * `pexwebapps.py` - Processes configuration database from a diagnostic snapshot into summary of Web App config
  * `staticroutes.py` - Processes configuration database from a diagnostic snapshot into summary of conferencing node's static routes

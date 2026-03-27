@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """connectivity: process admin logs for connectivity loss events."""
 
-# Copyright 2023 Pexip AS
+# Copyright 2026 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

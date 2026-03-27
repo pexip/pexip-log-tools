@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """dbsummary: extract key configuraton information into text format."""
 
-# Copyright 2024 Pexip AS
+# Copyright 2026 Pexip AS
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
