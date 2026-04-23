@@ -76,6 +76,8 @@ def main():
 
     try:
         log_files = sorted(glob.glob(os.path.join(rootdir, 'var/log/*administrator.log*')), key=os.path.getmtime)
+        if not log_files:
+            sys.exit(2)
     except OSError as err:
         print(err)
         sys.exit(2)
