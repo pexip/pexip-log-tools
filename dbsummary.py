@@ -1012,7 +1012,7 @@ class DBAnalyser:
         print("Total VMRs configured  : %d" % (vmr_count,))
 
     def tls_certs(self):
-        platform_workervm = self._builddict(self.configuration, 'platform_workervm', ('name', 'hostname', 'domain', 'address', 'alternative_fqdn', 'tls_certificate_id'), 'id')
+        platform_workervm = self._builddict(self.configuration, 'platform_workervm', ('name', 'hostname', 'domain', 'address', 'alternative_fqdn', 'tls_certificate_id', 'tls_client_certificate_id'), 'id')
         platform_tlscertificate = self._builddict(self.configuration, 'platform_tlscertificate', ('certificate',), 'id')
         platform_trustedca = self._builddict(self.configuration, 'platform_trustedca', ('certificate',), 'id')
 
@@ -1065,6 +1065,8 @@ class DBAnalyser:
                 fqdn += ' [%s]' % worker['alternative_fqdn']
             if worker['tls_certificate_id'] in tlscerts:
                 tlscerts[worker['tls_certificate_id']].append(fqdn)
+            if worker['tls_client_certificate_id'] in tlscerts:
+                tlscerts[worker['tls_client_certificate_id']].append(fqdn)
 
         for cert_id in tlscerts.keys():
             if len(tlscerts[cert_id]) == 0:
