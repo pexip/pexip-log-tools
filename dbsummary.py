@@ -275,7 +275,7 @@ class DBAnalyser:
                         if val.startswith('Intel(R) Xeon(R) CPU '):
                             val = val[21:]
                         model = val
-                    elif "flags" in key:
+                    elif "flags" in key and not flags:
                         if 'avx512' in val and 'xsave' in val:
                             flags = "AVX512"
                         elif 'avx2' in val and 'xsave' in val:
@@ -301,9 +301,9 @@ class DBAnalyser:
                     if not fields2:
                         continue
                     if fields2[0] == 'MemTotal:':
-                        memtotal = int(fields2[1]) / (1000 ** 2)  # Yes I know that's not 1024^2
+                        memtotal = int(fields2[1]) // (1000 ** 2)  # Yes I know that's not 1024^2
                     elif fields2[0] == 'MemFree:':
-                        memfree = int(fields2[1]) / (1000 ** 2)
+                        memfree = int(fields2[1]) // (1000 ** 2)
                 ret[hostname]["meminfo"] = { "memtotal": memtotal, "memfree": memfree}
         return ret
                 
