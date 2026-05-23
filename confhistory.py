@@ -15,12 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import itertools
-import json
-import operator
 import os
-import re
 import sqlite3
 import sys
 
@@ -79,12 +76,12 @@ class ConfHistory:
         participant_count = {}
         cur = self.history.cursor()
         if c_start and c_name:
-            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id IS NULL AND conference_name="%s" AND start_time > "%s" ORDER BY start_time' % (c_name, c_start))
+            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id IS NULL AND conference_name=? AND start_time > ? ORDER BY start_time', (c_name, c_start))
             cur2 = self.status.cursor()
-            cur2.execute('SELECT * from conferencingstatus_participant WHERE conference="%s" ORDER BY connect_time' % c_name)
+            cur2.execute('SELECT * from conferencingstatus_participant WHERE conference=? ORDER BY connect_time', (c_name,))
             itercur = itertools.chain(cur, cur2)
         else:
-            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id="%s" ORDER BY start_time' % c_uuid)
+            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id=? ORDER BY start_time', (c_uuid,))
             itercur = cur
 
         for row in itercur:
@@ -141,7 +138,7 @@ class ConfHistory:
 
             if start_ts:
                 cur2 = self.history.cursor()
-                cur2.execute('SELECT * from conferencinghistory_participantmediastream WHERE participant_id="%s"' % row['id'])
+                cur2.execute('SELECT * from conferencinghistory_participantmediastream WHERE participant_id=?', (row['id'],))
                 stats = [['', 'tx_codec', 'tx_resolution', 'tx_bitrate', 'tx_packets_sent', 'tx_packets_lost', 'rx_codec', 'rx_resolution', 'rx_bitrate', 'rx_packets_received', 'rx_packets_lost']]
                 for row in cur2:
                     stats.append([row['stream_type'], row['tx_codec'], row['tx_resolution'], row['tx_bitrate'], row['tx_packets_sent'], row['tx_packets_lost'], row['rx_codec'], row['rx_resolution'], row['rx_bitrate'], row['rx_packets_received'], row['rx_packets_lost']])
@@ -156,15 +153,13 @@ class ConfHistory:
                 prev_ts = ts
 
             print("Peak participants: %d" % max(participant_count.values()))
-            
 
     def conferences_history(self, conf):
-        if conf:
-            sql = 'SELECT * from conferencinghistory_conference WHERE name LIKE "%%%s%%" OR id = "%s" ORDER BY start_time' % (conf, conf)
-        else:
-            sql = 'SELECT * FROM conferencinghistory_conference ORDER BY start_time'
         cur = self.history.cursor()
-        cur.execute(sql)
+        if conf:
+            cur.execute('SELECT * from conferencinghistory_conference WHERE name LIKE ? OR id = ? ORDER BY start_time', ('%' + conf + '%', conf))
+        else:
+            cur.execute('SELECT * FROM conferencinghistory_conference ORDER BY start_time')
 
         for row in cur:
             times = "Start: %s / End: %s" % (row['start_time'], row['end_time'])
@@ -176,14 +171,12 @@ class ConfHistory:
             self.participants(c_uuid=row['id'])
             print()
 
-
     def conferences_status(self, conf):
-        if conf:
-            sql = 'SELECT * from conferencingstatus_conference WHERE name LIKE "%%%s%%" OR id = "%s" ORDER BY start_time' % (conf, conf)
-        else:
-            sql = 'SELECT * FROM conferencingstatus_conference ORDER BY start_time'
         cur = self.status.cursor()
-        cur.execute(sql)
+        if conf:
+            cur.execute('SELECT * from conferencingstatus_conference WHERE name LIKE ? OR id = ? ORDER BY start_time', ('%' + conf + '%', conf))
+        else:
+            cur.execute('SELECT * FROM conferencingstatus_conference ORDER BY start_time')
 
         for row in cur:
             times = "Start: %s / STILL RUNNING" % (row['start_time'],)
@@ -193,7 +186,6 @@ class ConfHistory:
             print("-" * len(times))
             self.participants(c_name=row['name'], c_start=row['start_time'])
             print()
-
 
 
 def main(rootdir, conf=None):
