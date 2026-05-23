@@ -72,6 +72,51 @@ class ConfHistory:
             self.nodes[row[0]] = row[1]
             self.locations[row[0]] = row[2]
 
+    def backplanes(self, c_uuid=None):
+        cur = self.history.cursor()
+        cur.execute('SELECT id, type from conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
+        headers = ['id', 'type']
+        data = [headers]
+        rows = cur.fetchall()
+        if not rows:
+            return
+        else:
+            print("Backplanes")
+            print(len("Backplanes") * "=")
+            for row in rows:
+                data.append([row['id'], row['type']])
+            tabulate(data)
+        if rows:
+            print()
+            for row in rows:
+                cur2 = self.history.cursor()
+                cur2.execute('SELECT backplane_id, stream_type, tx_codec, tx_resolution, tx_bitrate, tx_packets_sent, tx_packets_lost, rx_codec, rx_resolution, rx_bitrate, rx_packets_received, rx_packets_lost from conferencinghistory_backplanemediastream where backplane_id=?', (row['id'],))
+                rows = cur2.fetchall()
+                stats = [['', 'tx_codec', 'tx_resolution', 'tx_bitrate', 'tx_packets_sent', 'tx_packets_lost', 'rx_codec', 'rx_resolution', 'rx_bitrate', 'rx_packets_received', 'rx_packets_lost']]
+                backplane_id = ''
+                for row in rows:
+                    backplane_id = row['backplane_id']
+                    stats.append([
+                        row['stream_type'],
+                        row['tx_codec'],
+                        row['tx_resolution'],
+                        row['tx_bitrate'],
+                        row['tx_packets_sent'],
+                        row['tx_packets_lost'],
+                        row['rx_codec'],
+                        row['rx_resolution'],
+                        row['rx_bitrate'],
+                        row['rx_packets_received'],
+                        row['rx_packets_lost'],
+                    ])
+                if not rows:
+                    continue
+                print("Backplane ID: %s" % backplane_id)
+                tabulate(stats)
+                print()
+
+
+
     def participants(self, c_uuid=None, c_name=None, c_start=None):
         participant_count = {}
         cur = self.history.cursor()
@@ -141,7 +186,19 @@ class ConfHistory:
                 cur2.execute('SELECT * from conferencinghistory_participantmediastream WHERE participant_id=?', (row['id'],))
                 stats = [['', 'tx_codec', 'tx_resolution', 'tx_bitrate', 'tx_packets_sent', 'tx_packets_lost', 'rx_codec', 'rx_resolution', 'rx_bitrate', 'rx_packets_received', 'rx_packets_lost']]
                 for row in cur2:
-                    stats.append([row['stream_type'], row['tx_codec'], row['tx_resolution'], row['tx_bitrate'], row['tx_packets_sent'], row['tx_packets_lost'], row['rx_codec'], row['rx_resolution'], row['rx_bitrate'], row['rx_packets_received'], row['rx_packets_lost']])
+                    stats.append([
+                        row.get('stream_type', ''),
+                        row.get('tx_codec', ''),
+                        row.get('tx_resolution', ''),
+                        row.get('tx_bitrate', ''),
+                        row.get('tx_packets_sent', ''),
+                        row.get('tx_packets_lost', ''),
+                        row.get('rx_codec', ''),
+                        row.get('rx_resolution', ''),
+                        row.get('rx_bitrate', ''),
+                        row.get('rx_packets_received', ''),
+                        row.get('rx_packets_lost', ''),
+                    ])
                 tabulate(stats)
                 print()
 
@@ -152,7 +209,8 @@ class ConfHistory:
                     participant_count[ts] += participant_count[prev_ts]
                 prev_ts = ts
 
-            print("Peak participants: %d" % max(participant_count.values()))
+            peak_participants = "Peak participants: %d" % max(participant_count.values())
+            print(peak_participants)
 
     def conferences_history(self, conf):
         cur = self.history.cursor()
@@ -169,6 +227,8 @@ class ConfHistory:
             print(times)
             print("-" * len(times))
             self.participants(c_uuid=row['id'])
+            print()
+            self.backplanes(c_uuid=row['id'])
             print()
 
     def conferences_status(self, conf):
