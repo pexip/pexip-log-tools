@@ -73,9 +73,10 @@ class ConfHistory:
             self.locations[row[0]] = row[2]
 
     def backplanes(self, c_uuid=None):
+        backplanes = {}
         cur = self.history.cursor()
-        cur.execute('SELECT id, type from conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
-        headers = ['id', 'type']
+        cur.execute('SELECT id, type, start_time, end_time, duration, media_node, remote_media_node, proxy_node from conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
+        headers = ['id', 'type', 'start_time', 'end_time', 'duration']
         data = [headers]
         rows = cur.fetchall()
         if not rows:
@@ -84,7 +85,8 @@ class ConfHistory:
             print("Backplanes")
             print(len("Backplanes") * "=")
             for row in rows:
-                data.append([row['id'], row['type']])
+                backplanes[row['id']] = row
+                data.append([row['id'], row['type'], row['start_time'], row['end_time'], row['duration']])
             tabulate(data)
         if rows:
             print()
@@ -111,7 +113,21 @@ class ConfHistory:
                     ])
                 if not rows:
                     continue
-                print("Backplane ID: %s" % backplane_id)
+                bp = backplanes.get(backplane_id, {})
+                print(backplane_id)
+                if bp.get('proxy_node'):
+                    print(
+                        'Media Node: ' +
+                        str(bp.get('media_node') or 'None') + ' / Proxy Node: ' +
+                        str(bp.get('proxy_node') or 'None') + ' / Remote Media Node: ' +
+                        str(bp.get('remote_media_node') or 'None')
+                    )
+                else:
+                    print(
+                        'Media Node: ' +
+                        str(bp.get('media_node') or 'None') + ' / Remote Media Node: ' +
+                        str(bp.get('remote_media_node') or 'None')
+                    )
                 tabulate(stats)
                 print()
 
