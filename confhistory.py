@@ -15,11 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 from datetime import datetime
 import itertools
 import os
 import sqlite3
-import sys
 
 import locale
 try:
@@ -46,6 +46,29 @@ def dict_factory(cursor, row):
     for idx, col in enumerate(cursor.description):
         d[col[0]] = row[idx]
     return d
+
+
+def parse_args(argv=None):
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract conference history database into text format')
+    parser.add_argument('conf_or_rootdir', nargs='?', help='Conference name/uuid to search for, or root directory')
+    parser.add_argument('rootdir_pos', nargs='?', help='Root directory when conference name/uuid is provided')
+    parser.add_argument('--show-backplanes', action='store_true', help='Show backplane information')
+    return parser.parse_args(argv)
+
+
+def resolve_inputs(args):
+    """Resolve rootdir and optional conference filter from parsed args."""
+    if args.rootdir_pos:
+        return args.rootdir_pos, args.conf_or_rootdir
+
+    if args.conf_or_rootdir:
+        if os.path.isdir(args.conf_or_rootdir):
+            return args.conf_or_rootdir, None
+        return os.getcwd(), args.conf_or_rootdir
+
+    return os.getcwd(), None
+
 
 class ConfHistory:
     def __init__(self, rootdir):
@@ -75,10 +98,10 @@ class ConfHistory:
     def backplanes(self, c_uuid=None):
         backplanes = {}
         cur = self.history.cursor()
-        cur.execute('SELECT id, type, start_time, end_time, duration, media_node, remote_media_node, proxy_node from conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
-        headers = ['id', 'type', 'start_time', 'end_time', 'duration']
-        data = [headers]
+        cur.execute('SELECT id, type, media_node, remote_media_node, proxy_node, start_time, end_time, duration FROM conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
         rows = cur.fetchall()
+        headers = ['id', 'type', 'media_node', 'remote_media_node', 'proxy_node', 'start_time', 'end_time', 'duration']
+        data = [headers]
         if not rows:
             return
         else:
@@ -86,7 +109,7 @@ class ConfHistory:
             print(len("Backplanes") * "=")
             for row in rows:
                 backplanes[row['id']] = row
-                data.append([row['id'], row['type'], row['start_time'], row['end_time'], row['duration']])
+                data.append([row['id'], row['type'], row['media_node'], row['remote_media_node'], row['proxy_node'] if row['proxy_node'] else 'None', row['start_time'], row['end_time'], row['duration']])
             tabulate(data)
         if rows:
             print()
@@ -113,25 +136,9 @@ class ConfHistory:
                     ])
                 if not rows:
                     continue
-                bp = backplanes.get(backplane_id, {})
                 print(backplane_id)
-                if bp.get('proxy_node'):
-                    print(
-                        'Media Node: ' +
-                        str(bp.get('media_node') or 'None') + ' / Proxy Node: ' +
-                        str(bp.get('proxy_node') or 'None') + ' / Remote Media Node: ' +
-                        str(bp.get('remote_media_node') or 'None')
-                    )
-                else:
-                    print(
-                        'Media Node: ' +
-                        str(bp.get('media_node') or 'None') + ' / Remote Media Node: ' +
-                        str(bp.get('remote_media_node') or 'None')
-                    )
                 tabulate(stats)
                 print()
-
-
 
     def participants(self, c_uuid=None, c_name=None, c_start=None):
         participant_count = {}
@@ -228,7 +235,7 @@ class ConfHistory:
             peak_participants = "Peak participants: %d" % max(participant_count.values())
             print(peak_participants)
 
-    def conferences_history(self, conf):
+    def conferences_history(self, conf, show_backplanes=False):
         cur = self.history.cursor()
         if conf:
             cur.execute('SELECT * from conferencinghistory_conference WHERE name LIKE ? OR id = ? ORDER BY start_time', ('%' + conf + '%', conf))
@@ -243,9 +250,10 @@ class ConfHistory:
             print(times)
             print("-" * len(times))
             self.participants(c_uuid=row['id'])
-            print()
-            self.backplanes(c_uuid=row['id'])
-            print()
+            if show_backplanes:
+                print()
+                self.backplanes(c_uuid=row['id'])
+                print()
 
     def conferences_status(self, conf):
         cur = self.status.cursor()
@@ -264,30 +272,16 @@ class ConfHistory:
             print()
 
 
-def main(rootdir, conf=None):
+def main():
     """Main processing - rootdir is /opt/pexip/share equivalent under which databases lie"""
+    args = parse_args()
+    rootdir, conf = resolve_inputs(args)
+
     dba = ConfHistory(rootdir)
 
-    dba.conferences_history(conf)
+    dba.conferences_history(conf, show_backplanes=args.show_backplanes)
     dba.conferences_status(conf)
 
 
 if __name__ == "__main__":
-    rootdir = os.getcwd()
-    search = None
-    if len(sys.argv) > 2:
-        rootdir = sys.argv[2]
-        search = sys.argv[1]
-    elif len(sys.argv) > 1:
-        if os.path.isdir(sys.argv[1]):
-            rootdir = sys.argv[1]
-        else:
-            search = sys.argv[1]
-    try:
-        if len(sys.argv) > 1 and sys.argv[1].endswith("-help"):
-            print("Usage: confhistory [confname] [dir]")
-            print("confname can be partial name of a conference or a uuid")
-        else:
-            main(rootdir, search)
-    except (IOError, KeyboardInterrupt):
-        pass
+    main()
