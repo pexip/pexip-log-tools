@@ -15,12 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+import argparse
+from datetime import datetime
 import itertools
-import json
-import operator
 import os
-import re
 import sqlite3
 import sys
 
@@ -50,19 +48,39 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
+
+def parse_args(argv=None):
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='Extract conference history database into text format')
+    parser.add_argument('rootdir', nargs='?', default=os.getcwd(), help='Root directory under which to find databases (default: current directory)')
+    parser.add_argument('--conf', help='Conference name or uuid to search for')
+    parser.add_argument('--show-backplanes', action='store_true', help='Show backplane information')
+    return parser.parse_args(argv)
+
+
 class ConfHistory:
     def __init__(self, rootdir):
-        self.config = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/config/conferencing_configuration.db'))
-        self.config.row_factory = sqlite3.Row
+        def connect_db(db_path, label, row_factory):
+            if not os.path.isfile(db_path):
+                raise FileNotFoundError(f"{label} database not found: {db_path}")
+            try:
+                conn = sqlite3.connect(db_path)
+            except sqlite3.Error as exc:
+                raise RuntimeError(f"Unable to open {label} database: {db_path} ({exc})") from exc
+            conn.row_factory = row_factory
+            return conn
+
+        config_path = os.path.join(rootdir, 'opt/pexip/share/config/conferencing_configuration.db')
+        self.config = connect_db(config_path, 'config', sqlite3.Row)
 
         if os.path.isdir(os.path.join(rootdir, 'opt/pexip/share/status/db')):
-            self.status = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/status/db/conferencing_status.db'))
+            status_path = os.path.join(rootdir, 'opt/pexip/share/status/db/conferencing_status.db')
         else:
-            self.status = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/status/conferencing_status.db'))
-        self.status.row_factory = dict_factory
+            status_path = os.path.join(rootdir, 'opt/pexip/share/status/conferencing_status.db')
+        self.status = connect_db(status_path, 'status', dict_factory)
 
-        self.history = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/history/conferencing_history.db'))
-        self.history.row_factory = dict_factory
+        history_path = os.path.join(rootdir, 'opt/pexip/share/history/conferencing_history.db')
+        self.history = connect_db(history_path, 'history', dict_factory)
         self.nodes = {}
         self.locations = {}
         self._get_nodes()
@@ -75,16 +93,61 @@ class ConfHistory:
             self.nodes[row[0]] = row[1]
             self.locations[row[0]] = row[2]
 
+    def backplanes(self, c_uuid=None):
+        backplanes = {}
+        cur = self.history.cursor()
+        cur.execute('SELECT id, type, media_node, remote_media_node, proxy_node, start_time, end_time, duration FROM conferencinghistory_backplane WHERE conference_id=?', (c_uuid,))
+        rows = cur.fetchall()
+        headers = ['id', 'type', 'media_node', 'remote_media_node', 'proxy_node', 'start_time', 'end_time', 'duration']
+        data = [headers]
+        if not rows:
+            return
+        else:
+            print("Backplanes")
+            print(len("Backplanes") * "=")
+            for row in rows:
+                backplanes[row['id']] = row
+                data.append([row['id'], row['type'], row['media_node'], row['remote_media_node'], row['proxy_node'] if row['proxy_node'] else 'None', row['start_time'], row['end_time'], row['duration']])
+            tabulate(data)
+        if rows:
+            print()
+            for row in rows:
+                cur2 = self.history.cursor()
+                cur2.execute('SELECT backplane_id, stream_type, tx_codec, tx_resolution, tx_bitrate, tx_packets_sent, tx_packets_lost, rx_codec, rx_resolution, rx_bitrate, rx_packets_received, rx_packets_lost from conferencinghistory_backplanemediastream where backplane_id=?', (row['id'],))
+                rows = cur2.fetchall()
+                stats = [['', 'tx_codec', 'tx_resolution', 'tx_bitrate', 'tx_packets_sent', 'tx_packets_lost', 'rx_codec', 'rx_resolution', 'rx_bitrate', 'rx_packets_received', 'rx_packets_lost']]
+                backplane_id = ''
+                for row in rows:
+                    backplane_id = row['backplane_id']
+                    stats.append([
+                        row['stream_type'],
+                        row['tx_codec'],
+                        row['tx_resolution'],
+                        row['tx_bitrate'],
+                        row['tx_packets_sent'],
+                        row['tx_packets_lost'],
+                        row['rx_codec'],
+                        row['rx_resolution'],
+                        row['rx_bitrate'],
+                        row['rx_packets_received'],
+                        row['rx_packets_lost'],
+                    ])
+                if not rows:
+                    continue
+                print(backplane_id)
+                tabulate(stats)
+                print()
+
     def participants(self, c_uuid=None, c_name=None, c_start=None):
         participant_count = {}
         cur = self.history.cursor()
         if c_start and c_name:
-            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id IS NULL AND conference_name="%s" AND start_time > "%s" ORDER BY start_time' % (c_name, c_start))
+            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id IS NULL AND conference_name=? AND start_time > ? ORDER BY start_time', (c_name, c_start))
             cur2 = self.status.cursor()
-            cur2.execute('SELECT * from conferencingstatus_participant WHERE conference="%s" ORDER BY connect_time' % c_name)
+            cur2.execute('SELECT * from conferencingstatus_participant WHERE conference=? ORDER BY connect_time', (c_name,))
             itercur = itertools.chain(cur, cur2)
         else:
-            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id="%s" ORDER BY start_time' % c_uuid)
+            cur.execute('SELECT * from conferencinghistory_participant WHERE conference_id=? ORDER BY start_time', (c_uuid,))
             itercur = cur
 
         for row in itercur:
@@ -141,10 +204,22 @@ class ConfHistory:
 
             if start_ts:
                 cur2 = self.history.cursor()
-                cur2.execute('SELECT * from conferencinghistory_participantmediastream WHERE participant_id="%s"' % row['id'])
+                cur2.execute('SELECT * from conferencinghistory_participantmediastream WHERE participant_id=?', (row['id'],))
                 stats = [['', 'tx_codec', 'tx_resolution', 'tx_bitrate', 'tx_packets_sent', 'tx_packets_lost', 'rx_codec', 'rx_resolution', 'rx_bitrate', 'rx_packets_received', 'rx_packets_lost']]
                 for row in cur2:
-                    stats.append([row['stream_type'], row['tx_codec'], row['tx_resolution'], row['tx_bitrate'], row['tx_packets_sent'], row['tx_packets_lost'], row['rx_codec'], row['rx_resolution'], row['rx_bitrate'], row['rx_packets_received'], row['rx_packets_lost']])
+                    stats.append([
+                        row.get('stream_type', ''),
+                        row.get('tx_codec', ''),
+                        row.get('tx_resolution', ''),
+                        row.get('tx_bitrate', ''),
+                        row.get('tx_packets_sent', ''),
+                        row.get('tx_packets_lost', ''),
+                        row.get('rx_codec', ''),
+                        row.get('rx_resolution', ''),
+                        row.get('rx_bitrate', ''),
+                        row.get('rx_packets_received', ''),
+                        row.get('rx_packets_lost', ''),
+                    ])
                 tabulate(stats)
                 print()
 
@@ -155,16 +230,15 @@ class ConfHistory:
                     participant_count[ts] += participant_count[prev_ts]
                 prev_ts = ts
 
-            print("Peak participants: %d" % max(participant_count.values()))
-            
+            peak_participants = "Peak participants: %d" % max(participant_count.values())
+            print(peak_participants)
 
-    def conferences_history(self, conf):
-        if conf:
-            sql = 'SELECT * from conferencinghistory_conference WHERE name LIKE "%%%s%%" OR id = "%s" ORDER BY start_time' % (conf, conf)
-        else:
-            sql = 'SELECT * FROM conferencinghistory_conference ORDER BY start_time'
+    def conferences_history(self, conf, show_backplanes=False):
         cur = self.history.cursor()
-        cur.execute(sql)
+        if conf:
+            cur.execute('SELECT * from conferencinghistory_conference WHERE name LIKE ? OR id = ? ORDER BY start_time', ('%' + conf + '%', conf))
+        else:
+            cur.execute('SELECT * FROM conferencinghistory_conference ORDER BY start_time')
 
         for row in cur:
             times = "Start: %s / End: %s" % (row['start_time'], row['end_time'])
@@ -174,16 +248,17 @@ class ConfHistory:
             print(times)
             print("-" * len(times))
             self.participants(c_uuid=row['id'])
-            print()
-
+            if show_backplanes:
+                print()
+                self.backplanes(c_uuid=row['id'])
+                print()
 
     def conferences_status(self, conf):
-        if conf:
-            sql = 'SELECT * from conferencingstatus_conference WHERE name LIKE "%%%s%%" OR id = "%s" ORDER BY start_time' % (conf, conf)
-        else:
-            sql = 'SELECT * FROM conferencingstatus_conference ORDER BY start_time'
         cur = self.status.cursor()
-        cur.execute(sql)
+        if conf:
+            cur.execute('SELECT * from conferencingstatus_conference WHERE name LIKE ? OR id = ? ORDER BY start_time', ('%' + conf + '%', conf))
+        else:
+            cur.execute('SELECT * FROM conferencingstatus_conference ORDER BY start_time')
 
         for row in cur:
             times = "Start: %s / STILL RUNNING" % (row['start_time'],)
@@ -195,31 +270,19 @@ class ConfHistory:
             print()
 
 
-
-def main(rootdir, conf=None):
+def main():
     """Main processing - rootdir is /opt/pexip/share equivalent under which databases lie"""
-    dba = ConfHistory(rootdir)
+    args = parse_args()
+    try:
+        dba = ConfHistory(args.rootdir)
+        dba.conferences_history(args.conf, show_backplanes=args.show_backplanes)
+        dba.conferences_status(args.conf)
+    except (FileNotFoundError, RuntimeError, sqlite3.Error) as exc:
+        print(f"Error: {exc}", file=sys.stderr, flush=True)
+        return 1
 
-    dba.conferences_history(conf)
-    dba.conferences_status(conf)
+    return 0
 
 
 if __name__ == "__main__":
-    rootdir = os.getcwd()
-    search = None
-    if len(sys.argv) > 2:
-        rootdir = sys.argv[2]
-        search = sys.argv[1]
-    elif len(sys.argv) > 1:
-        if os.path.isdir(sys.argv[1]):
-            rootdir = sys.argv[1]
-        else:
-            search = sys.argv[1]
-    try:
-        if len(sys.argv) > 1 and sys.argv[1].endswith("-help"):
-            print("Usage: confhistory [confname] [dir]")
-            print("confname can be partial name of a conference or a uuid")
-        else:
-            main(rootdir, search)
-    except (IOError, KeyboardInterrupt):
-        pass
+    raise SystemExit(main())
