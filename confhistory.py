@@ -20,6 +20,7 @@ from datetime import datetime
 import itertools
 import os
 import sqlite3
+import sys
 
 import locale
 try:
@@ -51,38 +52,35 @@ def dict_factory(cursor, row):
 def parse_args(argv=None):
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Extract conference history database into text format')
-    parser.add_argument('conf_or_rootdir', nargs='?', help='Conference name/uuid to search for, or root directory')
-    parser.add_argument('rootdir_pos', nargs='?', help='Root directory when conference name/uuid is provided')
+    parser.add_argument('rootdir', nargs='?', default=os.getcwd(), help='Root directory under which to find databases (default: current directory)')
+    parser.add_argument('--conf', help='Conference name or uuid to search for')
     parser.add_argument('--show-backplanes', action='store_true', help='Show backplane information')
     return parser.parse_args(argv)
 
 
-def resolve_inputs(args):
-    """Resolve rootdir and optional conference filter from parsed args."""
-    if args.rootdir_pos:
-        return args.rootdir_pos, args.conf_or_rootdir
-
-    if args.conf_or_rootdir:
-        if os.path.isdir(args.conf_or_rootdir):
-            return args.conf_or_rootdir, None
-        return os.getcwd(), args.conf_or_rootdir
-
-    return os.getcwd(), None
-
-
 class ConfHistory:
     def __init__(self, rootdir):
-        self.config = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/config/conferencing_configuration.db'))
-        self.config.row_factory = sqlite3.Row
+        def connect_db(db_path, label, row_factory):
+            if not os.path.isfile(db_path):
+                raise FileNotFoundError(f"{label} database not found: {db_path}")
+            try:
+                conn = sqlite3.connect(db_path)
+            except sqlite3.Error as exc:
+                raise RuntimeError(f"Unable to open {label} database: {db_path} ({exc})") from exc
+            conn.row_factory = row_factory
+            return conn
+
+        config_path = os.path.join(rootdir, 'opt/pexip/share/config/conferencing_configuration.db')
+        self.config = connect_db(config_path, 'config', sqlite3.Row)
 
         if os.path.isdir(os.path.join(rootdir, 'opt/pexip/share/status/db')):
-            self.status = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/status/db/conferencing_status.db'))
+            status_path = os.path.join(rootdir, 'opt/pexip/share/status/db/conferencing_status.db')
         else:
-            self.status = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/status/conferencing_status.db'))
-        self.status.row_factory = dict_factory
+            status_path = os.path.join(rootdir, 'opt/pexip/share/status/conferencing_status.db')
+        self.status = connect_db(status_path, 'status', dict_factory)
 
-        self.history = sqlite3.connect(os.path.join(rootdir, 'opt/pexip/share/history/conferencing_history.db'))
-        self.history.row_factory = dict_factory
+        history_path = os.path.join(rootdir, 'opt/pexip/share/history/conferencing_history.db')
+        self.history = connect_db(history_path, 'history', dict_factory)
         self.nodes = {}
         self.locations = {}
         self._get_nodes()
@@ -275,13 +273,16 @@ class ConfHistory:
 def main():
     """Main processing - rootdir is /opt/pexip/share equivalent under which databases lie"""
     args = parse_args()
-    rootdir, conf = resolve_inputs(args)
+    try:
+        dba = ConfHistory(args.rootdir)
+        dba.conferences_history(args.conf, show_backplanes=args.show_backplanes)
+        dba.conferences_status(args.conf)
+    except (FileNotFoundError, RuntimeError, sqlite3.Error) as exc:
+        print(f"Error: {exc}", file=sys.stderr, flush=True)
+        return 1
 
-    dba = ConfHistory(rootdir)
-
-    dba.conferences_history(conf, show_backplanes=args.show_backplanes)
-    dba.conferences_status(conf)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
