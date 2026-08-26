@@ -408,6 +408,8 @@ class DBAnalyser:
                 print("Global Max Resolution: %s (In: %s, Out: %s)" % (platform_global.get('max_pixels_per_second').upper(), platform_global.get('max_callrate_in', 'None'), platform_global.get('max_callrate_out', 'None')))
             else:
                 print("Global Max Resolution:", platform_global.get('max_pixels_per_second').upper())
+        if 'max_presentation_bandwidth_ratio' in platform_global:
+            print("Max Presentation Bandwidth Ratio: %s%%" % platform_global.get('max_presentation_bandwidth_ratio'))
         if 'enable_lync_vbss' in platform_global:
             print("VBSS:", "Enabled" if platform_global.get('enable_lync_vbss') else "Disabled")
         if 'enable_turn_443' in platform_global:
