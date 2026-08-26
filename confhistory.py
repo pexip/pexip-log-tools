@@ -232,6 +232,7 @@ class ConfHistory:
 
             peak_participants = "Peak participants: %d" % max(participant_count.values())
             print(peak_participants)
+            print()
 
     def conferences_history(self, conf, show_backplanes=False):
         cur = self.history.cursor()
@@ -249,7 +250,6 @@ class ConfHistory:
             print("-" * len(times))
             self.participants(c_uuid=row['id'])
             if show_backplanes:
-                print()
                 self.backplanes(c_uuid=row['id'])
                 print()
 
