@@ -282,9 +282,22 @@ class Call:
             del self.msgs[i]
 
         gmsrequests = {}
+        gms_roster = {}
+        gms_hand_raises = {}
+        gms_device_aliases = {}
+        gms_device_names = {}
+        gms_self_device_ids = set()
         for msg in self.msgs:
             if not isinstance(msg, GMSMessage):
                 continue
+
+            msg._update_roster(
+                gms_roster,
+                gms_hand_raises,
+                gms_device_aliases,
+                gms_device_names,
+                gms_self_device_ids,
+            )
 
             if msg.msg == "Sending GMS request":
                 gmsrequests[msg.request_id] = msg
@@ -295,6 +308,44 @@ class Call:
             else:
                 if msg.request_id in gmsrequests:
                     msg.request = gmsrequests[msg.request_id]
+
+        roster_device_ids = set()
+        for msg in self.msgs:
+            if isinstance(msg, GMSMessage):
+                roster_device_ids.update(msg.roster)
+
+        roster_ids_by_name = defaultdict(list)
+        for device_id in roster_device_ids:
+            display_name = gms_device_names.get(device_id)
+            if display_name:
+                roster_ids_by_name[display_name].append(device_id)
+
+        for device_id, display_name in gms_device_names.items():
+            matching_roster_ids = roster_ids_by_name.get(display_name, [])
+            if device_id not in roster_device_ids and len(matching_roster_ids) == 1:
+                gms_device_aliases[device_id] = matching_roster_ids[0]
+
+        for msg in self.msgs:
+            if isinstance(msg, GMSMessage):
+                msg.device_names = gms_device_names.copy()
+                msg.device_aliases = gms_device_aliases.copy()
+            elif isinstance(msg, LogMessage):
+                presenter = msg.fields.get(
+                    "presenter", msg.fields.get("last-presenter")
+                )
+                primary_device_id = gms_device_aliases.get(presenter, presenter)
+                presenter_name = gms_device_names.get(
+                    primary_device_id, gms_device_names.get(presenter)
+                )
+                if presenter_name:
+                    if (
+                        presenter in gms_self_device_ids
+                        or primary_device_id in gms_self_device_ids
+                    ):
+                        presenter_name += " (self)"
+                    msg.presenter_name = "{} ({})".format(
+                        presenter_name, primary_device_id.rsplit("/", 1)[-1]
+                    )
 
         self.msgs.sort()
 
@@ -1394,6 +1445,12 @@ class GMSMessage(Message):
         self.from_addr = ""
         self.payload = {}
         self.qp = {}
+        self.roster = {}
+        self.device_names = {}
+        self.device_aliases = {}
+        self.self_device_ids = set()
+        self.media_stream_participant_ids = set()
+        self.stream_changes = []
         self.req = ""
         if not fields.get("detail"):
             return
@@ -1450,6 +1507,14 @@ class GMSMessage(Message):
 
     def _parse_type_data_channel(self, fields):
         lines = fields.get("detail").split("^M")
+        is_media_stream_add_response = (
+            self.msg == "Received GMS response"
+            and any("media_stream_add {" in line for line in lines)
+        )
+        is_media_stream_modify_response = (
+            self.msg == "Received GMS response"
+            and any("media_stream_modify {" in line for line in lines)
+        )
 
         error_response = False
         for i in range(len(lines)):
@@ -1457,7 +1522,13 @@ class GMSMessage(Message):
             i += 1
             if ":" in line:
                 key, val = line.split(":", 1)
-                self.payload[key.strip()] = val.strip()
+                key = key.strip()
+                val = val.strip()
+                if len(val) >= 2 and val[0] == val[-1] == '"':
+                    val = val[1:-1]
+                self.payload[key] = val
+                if is_media_stream_add_response and key == "participant_id":
+                    self.media_stream_participant_ids.add(val)
                 continue
 
             if self.msg == "Received GMS notification":
@@ -1506,6 +1577,11 @@ class GMSMessage(Message):
                 self.req += f"({error})"
             except Exception:
                 pass
+
+        if (
+            is_media_stream_add_response or is_media_stream_modify_response
+        ) and not error_response:
+            self.stream_changes = self._parse_media_stream_changes(lines)
 
         if self.msg in ["Received GMS notification", "Received GMS response"]:
             return
@@ -1557,6 +1633,143 @@ class GMSMessage(Message):
         except Exception:
             pass
 
+    @staticmethod
+    def _parse_media_stream_changes(lines):
+        stream_changes = []
+        resource = None
+        depth = 0
+
+        for line in lines:
+            stripped = line.strip()
+            if resource is None:
+                if stripped == "resource {":
+                    resource = {}
+                    depth = 1
+                continue
+
+            depth += stripped.count("{") - stripped.count("}")
+            if ":" in stripped:
+                key, value = stripped.split(":", 1)
+                key = key.strip()
+                value = value.strip().strip('"')
+                if key == "ssrc" and "ssrc" not in resource:
+                    resource["ssrc"] = value
+                elif key in {
+                    "direction",
+                    "media_type",
+                    "participant_id",
+                    "stream_id",
+                    "send",
+                    "height",
+                    "frame_rate",
+                }:
+                    resource[key] = value
+
+            if depth == 0:
+                if resource.get("media_type") == "VIDEO":
+                    stream_id = resource.get("ssrc", resource.get("stream_id"))
+                    if (
+                        resource.get("send") == "true"
+                        and stream_id
+                        and resource.get("height")
+                        and resource.get("frame_rate")
+                    ):
+                        stream_changes.append(
+                            (
+                                resource.get("participant_id"),
+                                resource.get("direction", "UNKNOWN"),
+                                "{}@{}p{}".format(
+                                    stream_id,
+                                    resource["height"],
+                                    resource["frame_rate"],
+                                ),
+                            )
+                        )
+                    elif resource.get("direction") == "UP" and stream_id:
+                        stream_changes.append(
+                            (
+                                resource.get("participant_id"),
+                                resource.get("direction", "UNKNOWN"),
+                                "{}@{}".format(
+                                    stream_id,
+                                    "on"
+                                    if resource.get("send") == "true"
+                                    else "off",
+                                ),
+                            )
+                        )
+                resource = None
+
+        return stream_changes
+
+    def _update_roster(
+        self, roster, hand_raises, device_aliases, device_names, self_device_ids
+    ):
+        for participant_id in self.media_stream_participant_ids:
+            self_device_ids.add(participant_id)
+            roster.setdefault(participant_id, participant_id)
+
+        if (
+            isinstance(self.payload, dict)
+            and self.payload.get("notification") == "meetings_update"
+        ):
+            meeting_device_id = self.payload.get("meeting_device_id")
+            primary_device_id = self.payload.get("primary_device_id")
+            display_name = self.payload.get("display_name")
+            if meeting_device_id:
+                if display_name:
+                    device_names[meeting_device_id] = display_name
+                if primary_device_id:
+                    device_aliases[meeting_device_id] = primary_device_id
+                    if primary_device_id in self_device_ids:
+                        self_device_ids.add(meeting_device_id)
+                    if display_name:
+                        device_names.setdefault(primary_device_id, display_name)
+                elif self.payload.get("join_state") in {"EJECTED", "LEFT"}:
+                    if roster.pop(meeting_device_id, None) is not None:
+                        self.payload["roster_changed"] = True
+                elif (
+                    display_name
+                    and (
+                        self.payload.get("join_state") == "JOINED"
+                        or meeting_device_id in roster
+                    )
+                    and roster.get(meeting_device_id) != display_name
+                ):
+                    roster_state = (
+                        "UPDATED"
+                        if meeting_device_id in roster
+                        else self.payload.get("join_state")
+                    )
+                    roster[meeting_device_id] = display_name
+                    self.payload["roster_changed"] = True
+                    self.payload["roster_state"] = roster_state
+
+            deleted_device_id = self.payload.get("deleted")
+            if deleted_device_id and "/devices/" in deleted_device_id:
+                if deleted_device_id not in device_aliases:
+                    if roster.pop(deleted_device_id, None) is not None:
+                        self.payload["roster_changed"] = True
+
+            hand_raise_id = self.payload.get("name")
+            if self.payload.get("hand_raised") == "true" and hand_raise_id:
+                hand_raise_device_id = device_aliases.get(
+                    meeting_device_id, meeting_device_id
+                )
+                hand_raises[hand_raise_id] = hand_raise_device_id
+                self.payload["hand_raise_state"] = "Raised"
+                self.payload["hand_raise_device_id"] = hand_raise_device_id
+
+            deleted_hand_raise_id = self.payload.get("deleted")
+            if deleted_hand_raise_id and "/handRaises/" in deleted_hand_raise_id:
+                self.payload["hand_raise_state"] = "Lowered"
+                self.payload["hand_raise_device_id"] = hand_raises.pop(
+                    deleted_hand_raise_id, None
+                )
+
+        self.roster = roster.copy()
+        self.self_device_ids = self_device_ids.copy()
+
     def __str__(self):
         if self.response:
             ret = f"{self.tts} -> meet.google.com "
@@ -1564,7 +1777,6 @@ class GMSMessage(Message):
             ret = f"{self.tts} <- meet.google.com "
         else:
             ret = f"{self.tts} ** {self.msg}"
-
         if "reason" in self.fields:
             ret += self.fields["reason"]
             if self.request and self.request.req:
@@ -1580,18 +1792,165 @@ class GMSMessage(Message):
         elif self.msg == "Received GMS notification":
             ret += " ({})".format(self.payload.get("notification"))
             if self.payload.get("notification") == "meetings_update":
-                ret += " [{}: {}]".format(
-                    self.payload.get("display_name"), self.payload.get("join_state")
-                )
+                if (
+                    "meeting_device_id" in self.payload
+                    and "hand_raised" not in self.payload
+                    and self.payload.get("is_presentation") != "true"
+                    and self.payload.get("roster_changed")
+                ):
+                    roster_change = " {}: {} ({})".format(
+                        self.payload.get(
+                            "roster_state", self.payload.get("join_state")
+                        ),
+                        self.payload.get("display_name"),
+                        self.payload.get("meeting_device_id").rsplit("/", 1)[-1]
+                    )
+                    roster_prefix = "{} ** {} ({}) ".format(
+                        self.tts, self.msg, self.payload.get("notification")
+                    )
+                    roster_entries = []
+                    roster_names = set()
+                    for device_id, display_name in self.roster.items():
+                        if "/devices/" in display_name:
+                            roster_entries.append(
+                                ("self", device_id.rsplit("/", 1)[-1], device_id)
+                            )
+                        elif device_id in self.self_device_ids:
+                            if display_name not in roster_names:
+                                roster_entries.append(
+                                    (
+                                        "{} (self)".format(display_name),
+                                        device_id.rsplit("/", 1)[-1],
+                                        device_id,
+                                    )
+                                )
+                                roster_names.add(display_name)
+                        elif display_name not in roster_names:
+                            roster_entries.append(
+                                (
+                                    display_name,
+                                    device_id.rsplit("/", 1)[-1],
+                                    device_id,
+                                )
+                            )
+                            roster_names.add(display_name)
+
+                    roster_state = self.payload.get(
+                        "roster_state", self.payload.get("join_state")
+                    )
+                    if roster_state in {"EJECTED", "LEFT"}:
+                        ret += " ROSTER (Total: {}){}".format(
+                            len(roster_entries), roster_change
+                        )
+                    else:
+                        ret += " ROSTER (Total: {}){}".format(
+                            len(roster_entries), roster_change
+                        )
+                        roster_indent = " " * len(roster_prefix)
+                        ret += "".join(
+                            "\n{}{} {}{}".format(
+                                roster_indent,
+                                "+"
+                                if roster_state == "JOINED"
+                                and full_device_id
+                                == self.payload.get("meeting_device_id")
+                                else "~",
+                                display_name,
+                                " ({})".format(device_id) if device_id else "",
+                            )
+                            for display_name, device_id, full_device_id in roster_entries
+                        )
+                # chat message notification
+                if "meeting_message_id" in self.payload:
+                    sender_device_id = self.payload.get(
+                        "sender_device_id", self.payload.get("by_meeting_device_id")
+                    )
+                    primary_device_id = self.device_aliases.get(
+                        sender_device_id, sender_device_id
+                    )
+                    sender_name = self.device_names.get(
+                        primary_device_id, self.device_names.get(sender_device_id)
+                    )
+                    if sender_name:
+                        if (
+                            sender_device_id in self.self_device_ids
+                            or primary_device_id in self.self_device_ids
+                        ):
+                            sender_name = "{} (self)".format(sender_name)
+                        sender_name = "{} ({})".format(
+                            sender_name, primary_device_id.rsplit("/", 1)[-1]
+                        )
+                    elif sender_device_id in self.self_device_ids:
+                        sender_name = "self ({})".format(sender_device_id)
+                    else:
+                        sender_name = sender_device_id or "Self"
+                    ret += " [{} from: {}]".format(
+                        self.payload.get("content_type"), sender_name
+                    )
+                if "hand_raise_state" in self.payload:
+                    hand_raise_device_id = self.payload.get("hand_raise_device_id")
+                    primary_device_id = self.device_aliases.get(
+                        hand_raise_device_id, hand_raise_device_id
+                    )
+                    participant_name = self.device_names.get(
+                        primary_device_id, self.device_names.get(hand_raise_device_id)
+                    )
+                    if participant_name:
+                        participant_name = "{} ({})".format(
+                            participant_name,
+                            primary_device_id.rsplit("/", 1)[-1],
+                        )
+                    else:
+                        participant_name = hand_raise_device_id or "Unknown"
+                    ret += " [Hand {}: {}]".format(
+                        self.payload["hand_raise_state"], participant_name
+                    )
         else:
-            ret += self.req
+            paired_rpc_details = ""
+            paired_rpc_ok = (
+                self.req == "RPC OK"
+                and self.request
+                and self.request.req.startswith("RPC ")
+            )
+            if paired_rpc_ok:
+                paired_rpc_method, _, paired_rpc_details = self.request.req.partition(
+                    " ["
+                )
+                ret += "{} OK".format(paired_rpc_method)
+            else:
+                ret += self.req
+            if self.stream_changes:
+                directions = []
+                for _, direction, _ in self.stream_changes:
+                    if direction not in directions:
+                        directions.append(direction)
+                ret += " ({})".format("/".join(directions))
+
+                changes = []
+                for participant_id, _, stream_change in self.stream_changes:
+                    primary_device_id = self.device_aliases.get(
+                        participant_id, participant_id
+                    )
+                    participant_name = self.device_names.get(
+                        primary_device_id,
+                        self.device_names.get(participant_id, participant_id or "Unknown"),
+                    )
+                    if (
+                        participant_id in self.self_device_ids
+                        or primary_device_id in self.self_device_ids
+                    ):
+                        participant_name += " (self)"
+                    changes.append("{}: {}".format(participant_name, stream_change))
+                ret += " [{}]".format(", ".join(changes))
+            elif paired_rpc_details:
+                ret += " [{}".format(paired_rpc_details)
 
             if self.qp.get("trusted", [None])[0] == "true":
                 ret += " [Trusted]"
 
             if self.payload.get("events"):
                 ret += f" ({self.events()})"
-            elif self.request and self.request.req:
+            elif self.request and self.request.req and not paired_rpc_ok:
                 events = self.request.events()
                 if events:
                     ret += f" [{self.request.req} ({events})]"
@@ -1740,6 +2099,7 @@ class LogMessage(Message):
         self.msg = fields["message"]
         self.fields = fields
         self.call = fields.get("call-id")
+        self.presenter_name = None
 
     def __str__(self):
         ret = self.tts + " "
@@ -1747,7 +2107,7 @@ class LogMessage(Message):
         ret += f"** {self.msg}"
         presenter = self.fields.get("presenter", self.fields.get("last-presenter"))
         if presenter:
-            ret += f", presenter = {presenter}"
+            ret += f", presenter = {self.presenter_name or presenter}"
 
         detail = self.fields.get("detail")
         if "dst-address" in self.fields:
