@@ -1678,10 +1678,10 @@ class GMSMessage(Message):
                             (
                                 resource.get("participant_id"),
                                 resource.get("direction", "UNKNOWN"),
-                                "{}@{}p{}".format(
-                                    stream_id,
+                                "{}p{}fps ssrc:{}".format(
                                     resource["height"],
                                     resource["frame_rate"],
+                                    stream_id,
                                 ),
                             )
                         )
@@ -1690,11 +1690,10 @@ class GMSMessage(Message):
                             (
                                 resource.get("participant_id"),
                                 resource.get("direction", "UNKNOWN"),
-                                "{}@{}".format(
+                                "{} ssrc:{} {}".format(
                                     stream_id,
-                                    "on"
-                                    if resource.get("send") == "true"
-                                    else "off",
+                                    resource.get("ssrc"),
+                                    "on" if resource.get("send") == "true" else "off",
                                 ),
                             )
                         )
