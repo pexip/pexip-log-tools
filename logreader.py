@@ -1623,10 +1623,10 @@ class GMSMessage(Message):
                     ):
                         continue
                     vsrs.append(
-                        "{}@{}p{}".format(
-                            stream.offer.ssrc[0],
+                        "{}p{}fps ssrc:{}".format(
                             stream.request.resolution.height,
                             stream.request.resolution.frame_rate,
+                            stream.request.ssrc,
                         )
                     )
                 self.req += " [{}]".format(", ".join(vsrs))
@@ -1690,8 +1690,7 @@ class GMSMessage(Message):
                             (
                                 resource.get("participant_id"),
                                 resource.get("direction", "UNKNOWN"),
-                                "{} ssrc:{} {}".format(
-                                    stream_id,
+                                "ssrc:{} {}".format(
                                     resource.get("ssrc"),
                                     "on" if resource.get("send") == "true" else "off",
                                 ),
