@@ -347,6 +347,190 @@ class Call:
                         presenter_name, primary_device_id.rsplit("/", 1)[-1]
                     )
 
+        gms_streams = {}
+        selected_video_streams = {}
+        presentation_devices = {}
+        participant_states = {}
+        for msg in self.msgs:
+            if not isinstance(msg, GMSMessage):
+                continue
+
+            for resource in msg.media_notification_changes:
+                stream_key = (resource.get("direction"), resource.get("stream_id"))
+                if resource.get("update_type") == "deleted":
+                    previous = gms_streams.pop(stream_key, {})
+                    for key, value in previous.items():
+                        resource.setdefault(key, value)
+                elif resource.get("stream_id"):
+                    if stream_key in gms_streams:
+                        resource["update_type"] = "updated"
+                    gms_streams[stream_key] = resource.copy()
+
+            if msg.payload.get("is_presentation") == "true":
+                presentation_id = msg.payload.get("meeting_device_id")
+                presentation_state = msg.payload.get("join_state")
+                if presentation_state == "JOINED":
+                    presentation_snapshot = (
+                        msg.payload.get("primary_device_id"),
+                        msg.payload.get("media_capture_type"),
+                    )
+                    if presentation_devices.get(presentation_id) != presentation_snapshot:
+                        msg.show_presentation_update = True
+                        presentation_devices[presentation_id] = presentation_snapshot
+                elif presentation_state in {"LEFT", "EJECTED"}:
+                    msg.show_presentation_update = presentation_id in presentation_devices
+                    presentation_devices.pop(presentation_id, None)
+            elif (
+                msg.payload.get("notification") == "meetings_update"
+                and msg.payload.get("meeting_device_id")
+                and msg.payload.get("join_state") == "JOINED"
+            ):
+                participant_id = msg.payload["meeting_device_id"]
+                participant_state = {
+                    key: msg.payload.get(key)
+                    for key in ("client_type", "meeting_role")
+                    if msg.payload.get(key)
+                }
+                previous_state = participant_states.get(participant_id)
+                if previous_state:
+                    for key, value in participant_state.items():
+                        previous_value = previous_state.get(key)
+                        if previous_value and previous_value != value:
+                            msg.participant_changes.append(
+                                (key, previous_value, value)
+                            )
+                participant_states[participant_id] = participant_state
+
+            is_modify_response = (
+                msg.msg == "Received GMS response"
+                and msg.request
+                and msg.request.req.startswith("RPC media_stream_modify")
+            )
+            if not is_modify_response:
+                continue
+
+            current_video_streams = {}
+            response_directions = set()
+            for resource in msg.media_resources:
+                if resource.get("media_type") != "VIDEO":
+                    continue
+                response_directions.add(resource.get("direction", "UNKNOWN"))
+                participant_id = resource.get("participant_id")
+                primary_device_id = gms_device_aliases.get(
+                    participant_id, participant_id
+                )
+                stream_key = (
+                    resource.get("direction", "UNKNOWN"),
+                    primary_device_id,
+                    resource.get("stream_id"),
+                )
+                if resource.get("send") == "true":
+                    current_video_streams[stream_key] = resource
+
+            for stream_key, resource in current_video_streams.items():
+                previous = selected_video_streams.get(stream_key)
+                if previous is None:
+                    msg.stream_deltas.append(("+", stream_key[1], resource))
+                elif (
+                    previous.get("height"),
+                    previous.get("frame_rate"),
+                ) != (
+                    resource.get("height"),
+                    resource.get("frame_rate"),
+                ):
+                    changed = resource.copy()
+                    changed["previous_height"] = previous.get("height")
+                    changed["previous_frame_rate"] = previous.get("frame_rate")
+                    msg.stream_deltas.append(("~", stream_key[1], changed))
+
+            for stream_key, resource in selected_video_streams.items():
+                if (
+                    stream_key[0] in response_directions
+                    and stream_key not in current_video_streams
+                ):
+                    msg.stream_deltas.append(("-", stream_key[1], resource))
+
+            selected_video_streams = {
+                stream_key: resource
+                for stream_key, resource in selected_video_streams.items()
+                if stream_key[0] not in response_directions
+            }
+            selected_video_streams.update(current_video_streams)
+
+        presentation_records = {}
+        active_presentation = None
+        for msg in self.msgs:
+            if isinstance(msg, GMSMessage):
+                if msg.payload.get("is_presentation") == "true":
+                    presentation_id = msg.payload.get("meeting_device_id")
+                    if presentation_id:
+                        record = presentation_records.setdefault(presentation_id, {})
+                        primary_device_id = msg.payload.get("primary_device_id")
+                        record.update(
+                            {
+                                "device_id": presentation_id,
+                                "primary_device_id": gms_device_aliases.get(
+                                    primary_device_id, primary_device_id
+                                ),
+                                "source": msg.payload.get("media_capture_type"),
+                            }
+                        )
+
+                for resource in msg.media_notification_changes + msg.media_resources:
+                    if resource.get("media_type") != "VIDEO":
+                        continue
+                    presentation_id = resource.get("participant_id")
+                    if not presentation_id:
+                        continue
+                    record = presentation_records.setdefault(
+                        presentation_id, {"device_id": presentation_id}
+                    )
+                    record["stream_id"] = resource.get(
+                        "ssrc", resource.get("stream_id")
+                    )
+                    if resource.get("height"):
+                        record["height"] = resource["height"]
+                    if resource.get("frame_rate"):
+                        record["frame_rate"] = resource["frame_rate"]
+                continue
+
+            if not isinstance(msg, LogMessage) or not msg.fields.get(
+                "name", ""
+            ).startswith("support.participantpresentationmodule"):
+                continue
+
+            if msg.msg == "Presentation started":
+                presentation_id = msg.fields.get("presenter")
+                record = presentation_records.get(presentation_id)
+                if record:
+                    msg.presentation_details = record.copy()
+                    active_presentation = {
+                        "details": record.copy(),
+                        "started": datetime.strptime(
+                            msg.tts, "%Y-%m-%d %H:%M:%S,%f"
+                        ),
+                    }
+            elif (
+                msg.msg == "Stopped sending presentation to participant"
+                and active_presentation
+            ):
+                msg.presentation_details = active_presentation["details"].copy()
+                stopped = datetime.strptime(msg.tts, "%Y-%m-%d %H:%M:%S,%f")
+                msg.presentation_details["duration"] = (
+                    stopped - active_presentation["started"]
+                ).total_seconds()
+                primary_device_id = msg.presentation_details.get(
+                    "primary_device_id"
+                )
+                presenter_name = gms_device_names.get(primary_device_id)
+                if presenter_name:
+                    if primary_device_id in gms_self_device_ids:
+                        presenter_name += " (self)"
+                    msg.presenter_name = "{} ({})".format(
+                        presenter_name, primary_device_id.rsplit("/", 1)[-1]
+                    )
+                active_presentation = None
+
         self.msgs.sort()
 
     def get_init(self):
@@ -436,6 +620,10 @@ class Call:
             if isinstance(msg, VSRMessage) and no_vsr:
                 continue
             if isinstance(msg, ExternalSpeakerMessage) and no_audio_msi:
+                continue
+            if isinstance(msg, GMSMessage) and msg.is_opaque_notification():
+                continue
+            if isinstance(msg, GMSMessage) and msg.is_noop_media_modify():
                 continue
             fp.write(f"{msg}\n")
 
@@ -1451,6 +1639,12 @@ class GMSMessage(Message):
         self.self_device_ids = set()
         self.media_stream_participant_ids = set()
         self.stream_changes = []
+        self.stream_deltas = []
+        self.media_resources = []
+        self.media_notification_changes = []
+        self.search_resources = []
+        self.show_presentation_update = False
+        self.participant_changes = []
         self.req = ""
         if not fields.get("detail"):
             return
@@ -1514,6 +1708,10 @@ class GMSMessage(Message):
         is_media_stream_modify_response = (
             self.msg == "Received GMS response"
             and any("media_stream_modify {" in line for line in lines)
+        )
+        is_media_stream_search_response = (
+            self.msg == "Received GMS response"
+            and any("media_stream_search {" in line for line in lines)
         )
 
         error_response = False
@@ -1581,7 +1779,16 @@ class GMSMessage(Message):
         if (
             is_media_stream_add_response or is_media_stream_modify_response
         ) and not error_response:
+            self.media_resources = self._parse_resource_blocks(lines, {"resource"})
             self.stream_changes = self._parse_media_stream_changes(lines)
+
+        if is_media_stream_search_response and not error_response:
+            self.search_resources = self._parse_resource_blocks(lines, {"result"})
+
+        if self.payload.get("notification") == "media_streams_update":
+            self.media_notification_changes = self._parse_resource_blocks(
+                lines, {"modified", "deleted"}
+            )
 
         if self.msg in ["Received GMS notification", "Received GMS response"]:
             return
@@ -1632,6 +1839,47 @@ class GMSMessage(Message):
                 self.req += " [{}]".format(", ".join(vsrs))
         except Exception:
             pass
+
+    @staticmethod
+    def _parse_resource_blocks(lines, block_names):
+        resources = []
+        resource = None
+        depth = 0
+
+        for line in lines:
+            stripped = line.strip()
+            if resource is None:
+                block_name = stripped[:-2] if stripped.endswith(" {") else ""
+                if block_name in block_names:
+                    resource = {"update_type": block_name}
+                    depth = 1
+                continue
+
+            depth += stripped.count("{") - stripped.count("}")
+            if ":" in stripped:
+                key, value = stripped.split(":", 1)
+                key = key.strip()
+                value = value.strip().strip('"')
+                if key == "ssrc":
+                    resource.setdefault("ssrc", value)
+                elif key in {
+                    "direction",
+                    "media_type",
+                    "stream_id",
+                    "participant_id",
+                    "send",
+                    "muted",
+                    "height",
+                    "width",
+                    "frame_rate",
+                }:
+                    resource[key] = value
+
+            if depth == 0:
+                resources.append(resource)
+                resource = None
+
+        return resources
 
     @staticmethod
     def _parse_media_stream_changes(lines):
@@ -1789,6 +2037,10 @@ class GMSMessage(Message):
                 ret += f" ({message})"
         elif self.msg == "Received GMS notification":
             ret += " ({})".format(self.payload.get("notification"))
+            if self.media_notification_changes:
+                ret += " " + self._format_media_resources(
+                    self.media_notification_changes, include_update_type=True
+                )
             if self.payload.get("notification") == "meetings_update":
                 if (
                     "meeting_device_id" in self.payload
@@ -1803,6 +2055,10 @@ class GMSMessage(Message):
                         self.payload.get("display_name"),
                         self.payload.get("meeting_device_id").rsplit("/", 1)[-1]
                     )
+                    if self.payload.get("roster_state") == "JOINED":
+                        metadata = self._participant_metadata()
+                        if metadata:
+                            roster_change += " [{}]".format(", ".join(metadata))
                     roster_prefix = "{} ** {} ({}) ".format(
                         self.tts, self.msg, self.payload.get("notification")
                     )
@@ -1903,8 +2159,46 @@ class GMSMessage(Message):
                     ret += " [Hand {}: {}]".format(
                         self.payload["hand_raise_state"], participant_name
                     )
+                if self.show_presentation_update:
+                    participant_id = self.payload.get("primary_device_id")
+                    primary_device_id = self.device_aliases.get(
+                        participant_id, participant_id
+                    )
+                    participant_name = self.device_names.get(
+                        primary_device_id,
+                        self.payload.get("display_name", "Unknown"),
+                    )
+                    state = self.payload.get("join_state", "UPDATED")
+                    capture_type = self.payload.get("media_capture_type", "UNKNOWN")
+                    device_id = self.payload.get("meeting_device_id", "").rsplit(
+                        "/", 1
+                    )[-1]
+                    ret += " [PRESENTATION {}: {} ({}) device:{} source:{}]".format(
+                        state,
+                        participant_name,
+                        primary_device_id.rsplit("/", 1)[-1]
+                        if primary_device_id
+                        else "Unknown",
+                        device_id,
+                        capture_type.lower(),
+                    )
+                if self.participant_changes:
+                    participant_id = self.payload.get("meeting_device_id")
+                    changes = []
+                    for key, previous, current in self.participant_changes:
+                        changes.append(
+                            "{} {} -> {}".format(
+                                key.lower().replace("_", " "),
+                                previous.lower().replace("_", " "),
+                                current.lower().replace("_", " "),
+                            )
+                        )
+                    ret += " [PARTICIPANT ~ {}: {}]".format(
+                        self._participant_name(participant_id), ", ".join(changes)
+                    )
         else:
             paired_rpc_details = ""
+            paired_rpc_method = ""
             paired_rpc_ok = (
                 self.req == "RPC OK"
                 and self.request
@@ -1917,7 +2211,14 @@ class GMSMessage(Message):
                 ret += "{} OK".format(paired_rpc_method)
             else:
                 ret += self.req
-            if self.stream_changes:
+            if self.search_resources:
+                ret += " " + self._format_stream_inventory()
+            elif paired_rpc_ok and paired_rpc_method == "RPC media_stream_modify":
+                if self.stream_deltas:
+                    ret += " " + self._format_stream_deltas()
+                else:
+                    ret += " [no video selection change]"
+            elif self.stream_changes:
                 directions = []
                 for _, direction, _ in self.stream_changes:
                     if direction not in directions:
@@ -1956,6 +2257,163 @@ class GMSMessage(Message):
                     ret += f" [{self.request.req}]"
 
         return ret
+
+    def _participant_metadata(self):
+        metadata = []
+        for key in ("client_type", "meeting_role"):
+            value = self.payload.get(key)
+            if value:
+                metadata.append(value.lower().replace("_", " "))
+        return metadata
+
+    def _participant_name(self, participant_id):
+        primary_device_id = self.device_aliases.get(participant_id, participant_id)
+        participant_name = self.device_names.get(
+            primary_device_id,
+            self.device_names.get(participant_id, participant_id or "Unknown"),
+        )
+        if (
+            participant_id in self.self_device_ids
+            or primary_device_id in self.self_device_ids
+        ):
+            participant_name += " (self)"
+        compact_id = primary_device_id.rsplit("/", 1)[-1] if primary_device_id else ""
+        return "{} ({})".format(participant_name, compact_id) if compact_id else participant_name
+
+    def _format_media_resources(self, resources, include_update_type=False):
+        grouped = defaultdict(list)
+        for resource in resources:
+            participant_id = resource.get("participant_id")
+            grouped[participant_id].append(resource)
+
+        summaries = []
+        for participant_id, participant_resources in grouped.items():
+            name = self._participant_name(participant_id)
+            details = []
+            update_types = set()
+            for resource in participant_resources:
+                update_types.add(resource.get("update_type"))
+                media_type = resource.get("media_type", "stream").lower()
+                direction = {"DOWN": "RX", "UP": "TX"}.get(
+                    resource.get("direction"), resource.get("direction", "")
+                )
+                stream_id = resource.get("ssrc", resource.get("stream_id", "?"))
+                state = "enabled" if resource.get("send") == "true" else "disabled"
+                if resource.get("muted") == "true":
+                    state += ", muted"
+                resolution = ""
+                if resource.get("height") and resource.get("frame_rate"):
+                    resolution = " {}p{}fps".format(
+                        resource["height"], resource["frame_rate"]
+                    )
+                details.append(
+                    "{} {} ssrc:{} {}{}".format(
+                        media_type, direction, stream_id, state, resolution
+                    ).strip()
+                )
+            marker = ""
+            if include_update_type:
+                if update_types == {"deleted"}:
+                    marker = "-"
+                elif "updated" in update_types:
+                    marker = "~"
+                else:
+                    marker = "+"
+            summaries.append("MEDIA {} {}: {}".format(marker, name, "; ".join(details)))
+        return " | ".join(summaries)
+
+    def _format_stream_inventory(self):
+        by_direction = defaultdict(list)
+        for resource in self.search_resources:
+            by_direction[resource.get("direction", "UNKNOWN")].append(resource)
+
+        summaries = []
+        for direction, resources in by_direction.items():
+            participants = {
+                self.device_aliases.get(
+                    resource.get("participant_id"), resource.get("participant_id")
+                )
+                for resource in resources
+            }
+            media_counts = []
+            for media_type in ("AUDIO", "VIDEO"):
+                matching = [
+                    resource
+                    for resource in resources
+                    if resource.get("media_type") == media_type
+                ]
+                if matching:
+                    enabled = sum(
+                        resource.get("send") == "true" for resource in matching
+                    )
+                    media_counts.append(
+                        "{} {}/{} enabled".format(
+                            media_type.lower(), enabled, len(matching)
+                        )
+                    )
+            summaries.append(
+                "{}: {} participant{}, {}".format(
+                    direction,
+                    len(participants),
+                    "" if len(participants) == 1 else "s",
+                    ", ".join(media_counts),
+                )
+            )
+        return "[STREAM INVENTORY {}]".format("; ".join(summaries))
+
+    def _format_stream_deltas(self):
+        changes = []
+        for action, participant_id, resource in self.stream_deltas:
+            detail = "{}p{}fps ssrc:{}".format(
+                resource.get("height", "?"),
+                resource.get("frame_rate", "?"),
+                resource.get("ssrc", resource.get("stream_id", "?")),
+            )
+            if action == "~":
+                detail = "{}p{}fps -> {}".format(
+                    resource.get("previous_height", "?"),
+                    resource.get("previous_frame_rate", "?"),
+                    detail,
+                )
+            changes.append(
+                "{} {} {}".format(action, self._participant_name(participant_id), detail)
+            )
+        return "[VIDEO {}]".format(", ".join(changes))
+
+    def is_opaque_notification(self):
+        if self.msg != "Received GMS notification":
+            return False
+        if self.payload.get("notification") == "media_streams_update":
+            return not self.media_notification_changes
+        if self.payload.get("notification") == "meetings_update":
+            return not any(
+                (
+                    self.payload.get("roster_changed"),
+                    self.payload.get("meeting_message_id"),
+                    self.payload.get("hand_raise_state"),
+                    self.show_presentation_update,
+                    self.participant_changes,
+                )
+            )
+        return False
+
+    def is_noop_media_modify(self):
+        if (
+            self.msg == "Sending GMS request"
+            and self.req.startswith("RPC media_stream_modify")
+        ):
+            return bool(
+                self.response
+                and self.response.req == "RPC OK"
+                and not self.response.stream_deltas
+            )
+        return bool(
+            self.msg == "Received GMS response"
+            and self.req == "RPC OK"
+            and self.request
+            and self.request.req.startswith("RPC media_stream_modify")
+            and not self.stream_deltas
+        )
 
     def events(self):
         if self.payload.get("events"):
@@ -2098,6 +2556,7 @@ class LogMessage(Message):
         self.fields = fields
         self.call = fields.get("call-id")
         self.presenter_name = None
+        self.presentation_details = None
 
     def __str__(self):
         ret = self.tts + " "
@@ -2106,6 +2565,38 @@ class LogMessage(Message):
         presenter = self.fields.get("presenter", self.fields.get("last-presenter"))
         if presenter:
             ret += f", presenter = {self.presenter_name or presenter}"
+        elif self.presentation_details and self.presenter_name:
+            ret += f", presenter = {self.presenter_name}"
+
+        if self.presentation_details:
+            source_names = {
+                "SCREENCAST_PRESENT": "screen share",
+                "HDMI_PRESENT": "HDMI",
+            }
+            source = self.presentation_details.get("source")
+            details = []
+            if source:
+                details.append("source: {}".format(source_names.get(source, source)))
+            device_id = self.presentation_details.get("device_id")
+            if device_id:
+                details.append("device:{}".format(device_id.rsplit("/", 1)[-1]))
+            stream_id = self.presentation_details.get("stream_id")
+            if stream_id:
+                stream = "video ssrc:{}".format(stream_id)
+                if self.presentation_details.get(
+                    "height"
+                ) and self.presentation_details.get("frame_rate"):
+                    stream += " {}p{}fps".format(
+                        self.presentation_details["height"],
+                        self.presentation_details["frame_rate"],
+                    )
+                details.append(stream)
+            if "duration" in self.presentation_details:
+                details.append(
+                    "duration:{:.3f}s".format(self.presentation_details["duration"])
+                )
+            if details:
+                ret += " [{}]".format(", ".join(details))
 
         detail = self.fields.get("detail")
         if "dst-address" in self.fields:
