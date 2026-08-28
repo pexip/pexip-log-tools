@@ -1940,7 +1940,9 @@ class GMSMessage(Message):
                                 resource.get("direction", "UNKNOWN"),
                                 "ssrc:{} {}".format(
                                     resource.get("ssrc"),
-                                    "on" if resource.get("send") == "true" else "off",
+                                    "requested"
+                                    if resource.get("send") == "true"
+                                    else "not requested",
                                 ),
                             )
                         )
@@ -2221,8 +2223,9 @@ class GMSMessage(Message):
             elif self.stream_changes:
                 directions = []
                 for _, direction, _ in self.stream_changes:
-                    if direction not in directions:
-                        directions.append(direction)
+                    display_direction = self._media_direction(direction)
+                    if display_direction not in directions:
+                        directions.append(display_direction)
                 ret += " ({})".format("/".join(directions))
 
                 changes = []
@@ -2266,6 +2269,10 @@ class GMSMessage(Message):
                 metadata.append(value.lower().replace("_", " "))
         return metadata
 
+    @staticmethod
+    def _media_direction(direction):
+        return {"DOWN": "TX", "UP": "RX"}.get(direction, direction or "UNKNOWN")
+
     def _participant_name(self, participant_id):
         primary_device_id = self.device_aliases.get(participant_id, participant_id)
         participant_name = self.device_names.get(
@@ -2294,11 +2301,13 @@ class GMSMessage(Message):
             for resource in participant_resources:
                 update_types.add(resource.get("update_type"))
                 media_type = resource.get("media_type", "stream").lower()
-                direction = {"DOWN": "RX", "UP": "TX"}.get(
-                    resource.get("direction"), resource.get("direction", "")
-                )
+                direction = self._media_direction(resource.get("direction"))
                 stream_id = resource.get("ssrc", resource.get("stream_id", "?"))
-                state = "enabled" if resource.get("send") == "true" else "disabled"
+                state = (
+                    "requested"
+                    if resource.get("send") == "true"
+                    else "not requested"
+                )
                 if resource.get("muted") == "true":
                     state += ", muted"
                 resolution = ""
@@ -2343,17 +2352,17 @@ class GMSMessage(Message):
                     if resource.get("media_type") == media_type
                 ]
                 if matching:
-                    enabled = sum(
+                    requested = sum(
                         resource.get("send") == "true" for resource in matching
                     )
                     media_counts.append(
-                        "{} {}/{} enabled".format(
-                            media_type.lower(), enabled, len(matching)
+                        "{} {}/{} requested".format(
+                            media_type.lower(), requested, len(matching)
                         )
                     )
             summaries.append(
                 "{}: {} participant{}, {}".format(
-                    direction,
+                    self._media_direction(direction),
                     len(participants),
                     "" if len(participants) == 1 else "s",
                     ", ".join(media_counts),
@@ -2376,7 +2385,12 @@ class GMSMessage(Message):
                     detail,
                 )
             changes.append(
-                "{} {} {}".format(action, self._participant_name(participant_id), detail)
+                "{} {} {} {}".format(
+                    action,
+                    self._media_direction(resource.get("direction")),
+                    self._participant_name(participant_id),
+                    detail,
+                )
             )
         return "[VIDEO {}]".format(", ".join(changes))
 
