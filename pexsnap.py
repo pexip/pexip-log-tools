@@ -33,7 +33,6 @@
 
 import argparse
 from datetime import datetime
-import fileinput
 import glob
 import json
 import os
@@ -43,7 +42,6 @@ try:
 except:
     autokey = False
     pass
-import re
 import subprocess
 import sys
 import tarfile
@@ -78,7 +76,8 @@ external_scripts = {
     },
     'conference_history': {
         'logfile':'pex_report_confhistory.log',
-        'script':script_location+'/confhistory.py'
+        'script':script_location+'/confhistory.py',
+        'skip': True
     },
     'connectivity': {
         'logfile':'pex_health_connectivity_report.log',
@@ -102,11 +101,13 @@ external_scripts = {
     },
     'logreader': {
         'logfile':'pex_report_logreader.log',
-        'script':script_location+'/logreader.py'
+        'script':script_location+'/logreader.py',
+        'skip': True
     },
     'logspam': {
         'logfile':'pex_report_logspam.log',
-        'script':script_location+'/log_spam.py'
+        'script':script_location+'/log_spam.py',
+        'skip': True
     },
     'mjx_summary': {
         'logfile':'pex_report_mjxsummary.log',
@@ -114,7 +115,8 @@ external_scripts = {
     },
     'irregular_ping': {
         'logfile':'pex_health_irregular_ping.log',
-        'script':script_location+'/pexpings.py'
+        'script':script_location+'/pexpings.py',
+        'skip': True
     },
     'vmotion': {
         'logfile':'pex_health_vmotionreport.log',
@@ -128,13 +130,21 @@ external_scripts = {
 
 config_file = expanduser('~/pexscripts')+'/pexsnap.json'
 
-if isfile(config_file):
-    try:
-        load_config = json.load(open(config_file))
-    except:
-        print('Error loading configuration file, please manually remove '+config_file+' and try again.')
-        sys.exit(2)
-else:
+# start
+def parse_args(args=None):
+    parser = argparse.ArgumentParser(description='Python variant of the Pexip Log Tools')
+    parser.add_argument('dir', nargs='?', help='output directory name under ~/Downloads/snapshots/ (snapshot is always read from cwd)')
+    parser.add_argument('-s', '--skip', action='store_true', help='skip confhistory and logreader processing')
+    parser.add_argument('-o', '--old', action='store_true', help='use older decryption method')
+    return parser.parse_args(args=args)
+
+def load_editor_config():
+    if isfile(config_file):
+        try:
+            return json.load(open(config_file))
+        except:
+            print('Error loading configuration file, please manually remove '+config_file+' and try again.')
+            sys.exit(2)
     while True:
         open_in_editor = input('Open the parsed files in an editor once complete? ([y]es or [n]o):').lower().strip()
         if open_in_editor[0] == 'y':
@@ -149,24 +159,12 @@ else:
                 save_config = {'open_in_atom' : False, 'open_in_code' : False, 'open_in_subl' : True}
                 break
         elif open_in_editor[0] == 'n':
-                save_config = {'open_in_atom' : False, 'open_in_code' : False, 'open_in_subl' : False}
-                break
+            save_config = {'open_in_atom' : False, 'open_in_code' : False, 'open_in_subl' : False}
+            break
         else:
             print("Please enter [y]es or [n]o")
     json.dump(save_config, open(config_file, 'w'))
-    load_config = json.load(open(config_file))
-
-open_in_atom = load_config.get('open_in_atom', False) # open parsed files in Atom when script completes
-open_in_code = load_config.get('open_in_code', False) # open parsed files in VSCode Text when script completes
-open_in_subl = load_config.get('open_in_subl', False) # open parsed files in Sublime Text when script completes
-
-# start
-def parse_args(args=None):
-    parser = argparse.ArgumentParser(description='Python variant of the Pexip Log Tools')
-    parser.add_argument('dir', nargs='?', help='directory to extract the snapshot')
-    parser.add_argument('-s', '--skip', action='store_true', help='skip confhistory and logreader processing')
-    parser.add_argument('-o', '--old', action='store_true', help='use older decryption method')
-    return parser.parse_args(args=args)
+    return save_config
 
 def decrypt(in_file, out_file, decrypt_method, key):
     password = ''
@@ -286,6 +284,32 @@ def extract_snap(snapshot_output, snapshot_input, decrypt_method, dir): # extrac
         os.remove(snapshot_purge)
     return (snapshot_output)
 
+def _find_grep():
+    try:
+        subprocess.run(['rg', '--version'], capture_output=True, check=True)
+        return 'rg'
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return 'grep'
+
+_GREP_TOOL = _find_grep()
+
+def grep_files(pattern, files, output_path, fixed=False):
+    if not files:
+        return
+    if _GREP_TOOL == 'rg':
+        cmd = ['rg', '-H', '-N', '--no-heading']
+        if fixed:
+            cmd += ['-F']
+    else:
+        cmd = ['grep', '-H']
+        if fixed:
+            cmd += ['-F']
+        if not fixed:
+            cmd += ['-E']
+    cmd += [pattern] + files
+    with open(output_path, 'w') as f:
+        subprocess.run(cmd, stdout=f, stderr=subprocess.DEVNULL)
+
 def run_lr(path, snapshot_output, script_path, script_output):
     try:
         path = path.replace(" ", "\\ ")
@@ -305,6 +329,12 @@ def main():
     worker = False
     cwd = os.getcwd()
     args = parse_args()
+    load_config = load_editor_config()
+    open_in_atom = load_config.get('open_in_atom', False)
+    open_in_code = load_config.get('open_in_code', False)
+    open_in_subl = load_config.get('open_in_subl', False)
+    if args.skip:
+        print(' -- Skipping processing (-s)')
     snapshot_input = select_snap(cwd) # select a snapshot from current working directory
     if args.old:
         decrypt_method = True
@@ -329,25 +359,14 @@ def main():
         if worker == False:
             print(' -- Checking for stability issues')
             if dev_files_array:
-                for line in fileinput.input(dev_files_array):
-                    if 'Reactor stalling' in line:
-                        with open(snapshot_output + parsedlogdir + rectorstallingtext, 'a') as output_file:
-                            output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
-                    if 'Multiple numa nodes detected during sampling' in line:
-                        with open(snapshot_output + parsedlogdir + numaconfigurattext, 'a') as output_file:
-                            output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
+                grep_files('Reactor stalling', dev_files_array, snapshot_output + parsedlogdir + rectorstallingtext, fixed=True)
+                grep_files('Multiple numa nodes detected during sampling', dev_files_array, snapshot_output + parsedlogdir + numaconfigurattext, fixed=True)
             if sys_files_array:
-                for line in fileinput.input(sys_files_array):
-                    match = re.compile(r'e1000.*Reset adapter')
-                    if match.findall(line):
-                        with open(snapshot_output + parsedlogdir + e1adapteresetstext, 'a') as output_file:
-                            output_file.write(("{}:{}").format(fileinput.filename().split('/')[-1], line))
+                grep_files(r'e1000.*Reset adapter', sys_files_array, snapshot_output + parsedlogdir + e1adapteresetstext)
 
             for script, values in external_scripts.items(): # run external scripts
                 if os.path.isfile(values['script']):
-                    if script == 'logreader' and args.skip:
-                        continue
-                    elif script == 'conference_history' and args.skip:
+                    if values.get('skip') and args.skip:
                         continue
                     elif script == 'logreader':
                         print(' -- Creating ' + script + ' output')
