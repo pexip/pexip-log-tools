@@ -307,7 +307,7 @@ def grep_files(pattern, files, output_path, fixed=False):
         if not fixed:
             cmd += ['-E']
     cmd += [pattern] + files
-    result = subprocess.run(cmd, capture_output=True, stderr=subprocess.DEVNULL)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     if result.stdout:
         with open(output_path, 'wb') as f:
             f.write(result.stdout)
