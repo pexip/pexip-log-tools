@@ -307,8 +307,10 @@ def grep_files(pattern, files, output_path, fixed=False):
         if not fixed:
             cmd += ['-E']
     cmd += [pattern] + files
-    with open(output_path, 'w') as f:
-        subprocess.run(cmd, stdout=f, stderr=subprocess.DEVNULL)
+    result = subprocess.run(cmd, capture_output=True, stderr=subprocess.DEVNULL)
+    if result.stdout:
+        with open(output_path, 'wb') as f:
+            f.write(result.stdout)
 
 def run_lr(path, snapshot_output, script_path, script_output):
     try:
