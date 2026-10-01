@@ -143,7 +143,10 @@ def main(rootdir):
         platform_mjxendpoints = builddict(configuration, 'platform_mjxendpoint', ('description', 'name', 'endpoint_type', 'api_address', 'api_port', 'api_username', 'verify_cert', 'use_https', 'mjx_endpoint_group_id', 'poly_raise_alarms_for_this_endpoint', 'poly_username', 'room_resource_email', 'webex_device_id'), 'id')
     else:
         platform_mjxendpoints = builddict(configuration, 'platform_mjxendpoint', ('description', 'name', 'endpoint_type', 'api_address', 'api_port', 'api_username', 'verify_cert', 'use_https', 'mjx_endpoint_group_id', 'poly_raise_alarms_for_this_endpoint', 'poly_username', 'room_resource_email'), 'id')
-    platform_mjxmeetingprocessingrule = builddict(configuration, 'platform_mjxmeetingprocessingrule', ('name', 'description', 'priority', 'transform_rule', 'custom_template', 'enabled', 'mjx_integration_id', 'domain', 'default_processing_enabled', 'match_string', 'meeting_type'), 'id')
+    if version['version-id'] >= '38':
+        platform_mjxmeetingprocessingrule = builddict(configuration, 'platform_mjxmeetingprocessingrule', ('name', 'description', 'priority', 'transform_rule', 'custom_template', 'enabled', 'mjx_integration_id', 'domain', 'default_processing_enabled', 'match_string', 'meeting_type', 'include_pin', 'company_id'), 'id')
+    else:
+        platform_mjxmeetingprocessingrule = builddict(configuration, 'platform_mjxmeetingprocessingrule', ('name', 'description', 'priority', 'transform_rule', 'custom_template', 'enabled', 'mjx_integration_id', 'domain', 'default_processing_enabled', 'match_string', 'meeting_type'), 'id')
     if version['version-id'] >= '24':
         conferencingstatus_mjxendpoint = builddict(conferencing_status, 'conferencingstatus_mjxendpoint', ('endpoint_name', 'endpoint_type', 'endpoint_address', 'room_email', 'mjx_integration_name', 'last_worker', 'number_of_meetings', 'last_contact_time'), 'id')
         conferencingstatus_mjxmeeting = builddict(conferencing_status, 'conferencingstatus_mjxmeeting', ('subject', 'start_time', 'end_time', 'organizer_name', 'organizer_email', 'alias', 'matched_meeting_processing_rule', 'endpoint_name', 'room_email', 'mjx_integration_name', 'worker_id'), 'id')
