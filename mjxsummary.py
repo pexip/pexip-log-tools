@@ -143,7 +143,7 @@ def main(rootdir):
         platform_mjxendpoints = builddict(configuration, 'platform_mjxendpoint', ('description', 'name', 'endpoint_type', 'api_address', 'api_port', 'api_username', 'verify_cert', 'use_https', 'mjx_endpoint_group_id', 'poly_raise_alarms_for_this_endpoint', 'poly_username', 'room_resource_email', 'webex_device_id'), 'id')
     else:
         platform_mjxendpoints = builddict(configuration, 'platform_mjxendpoint', ('description', 'name', 'endpoint_type', 'api_address', 'api_port', 'api_username', 'verify_cert', 'use_https', 'mjx_endpoint_group_id', 'poly_raise_alarms_for_this_endpoint', 'poly_username', 'room_resource_email'), 'id')
-    if version['version-id'] >= '38':
+    if version['version-id'] >= '35':
         platform_mjxmeetingprocessingrule = builddict(configuration, 'platform_mjxmeetingprocessingrule', ('name', 'description', 'priority', 'transform_rule', 'custom_template', 'enabled', 'mjx_integration_id', 'domain', 'default_processing_enabled', 'match_string', 'meeting_type', 'include_pin', 'company_id'), 'id')
     else:
         platform_mjxmeetingprocessingrule = builddict(configuration, 'platform_mjxmeetingprocessingrule', ('name', 'description', 'priority', 'transform_rule', 'custom_template', 'enabled', 'mjx_integration_id', 'domain', 'default_processing_enabled', 'match_string', 'meeting_type'), 'id')
